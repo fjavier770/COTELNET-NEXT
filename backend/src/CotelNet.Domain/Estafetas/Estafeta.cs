@@ -17,6 +17,14 @@ public sealed class Estafeta : Entity
     public string Nombre { get; private set; } = string.Empty;
     public bool Activa { get; private set; }
 
+    public void Update(string codigo, string nombre, bool activa)
+    {
+        Codigo = Require(codigo, nameof(codigo), 20);
+        Nombre = Require(nombre, nameof(nombre), 150);
+        Activa = activa;
+        MarkUpdated();
+    }
+
     private static string Require(string value, string name, int maxLength)
     {
         value = value?.Trim() ?? string.Empty;
@@ -25,4 +33,3 @@ public sealed class Estafeta : Entity
         return value;
     }
 }
-

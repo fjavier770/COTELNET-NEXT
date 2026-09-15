@@ -6,14 +6,14 @@ public sealed class User : Entity
 {
     private User() { }
 
-    public User(string username, string fullName, string passwordHash, string passwordSalt, int iterations, string role)
+    public User(string username, string fullName, string passwordHash, string passwordSalt, int iterations, int roleId)
     {
         Username = username.Trim().ToLowerInvariant();
         FullName = fullName.Trim();
         PasswordHash = passwordHash;
         PasswordSalt = passwordSalt;
         PasswordIterations = iterations;
-        Role = role.Trim();
+        RoleId = roleId;
         Active = true;
     }
 
@@ -22,13 +22,23 @@ public sealed class User : Entity
     public string PasswordHash { get; private set; } = string.Empty;
     public string PasswordSalt { get; private set; } = string.Empty;
     public int PasswordIterations { get; private set; }
-    public string Role { get; private set; } = string.Empty;
     public bool Active { get; private set; }
     public int? EstafetaId { get; private set; }
+    public int RoleId { get; private set; }
+    public Role Role { get; private set; } = null!;
 
     public void AssignEstafeta(int? estafetaId)
     {
         EstafetaId = estafetaId;
+        MarkUpdated();
+    }
+
+    public void Update(string fullName, int roleId, int? estafetaId, bool active)
+    {
+        FullName = fullName.Trim();
+        RoleId = roleId;
+        EstafetaId = estafetaId;
+        Active = active;
         MarkUpdated();
     }
 }

@@ -1,29 +1,22 @@
-import { AppBar, Box, Button, Card, CardContent, Container, Grid, Toolbar, Typography } from '@mui/material'
+import { Card, CardContent, Container, Grid, Typography } from '@mui/material'
 
 const modules = [
-  ['Ventas', 'Registro de cobros y servicios postales'],
-  ['Envíos', 'Envíos postales, etiquetas y seguimiento'],
-  ['Caja', 'Apertura, recaudación y cierre diario'],
-  ['Inventario', 'Productos, franqueo y asignaciones'],
-  ['Apartados', 'Alquileres, adjuntos y morosidad'],
-  ['Reportes', 'Informes, estadísticas y conciliaciones'],
+  ['Ventas', 'Registro de cobros y servicios postales', 'ventas.access'],
+  ['Envíos', 'Envíos postales, etiquetas y seguimiento', 'envios.access'],
+  ['Caja', 'Apertura, recaudación y cierre diario', 'caja.access'],
+  ['Inventario', 'Productos, franqueo y asignaciones', 'inventario.access'],
+  ['Apartados', 'Alquileres, adjuntos y morosidad', 'apartados.access'],
+  ['Reportes', 'Informes, estadísticas y conciliaciones', 'reportes.access'],
 ]
 
-export default function DashboardPage({ session, onLogout }) {
+export default function DashboardPage({ session }) {
+  const visibleModules = modules.filter((module) => (session.permissions ?? []).includes(module[2]))
   return (
-    <Box sx={{ minHeight: '100vh' }}>
-      <AppBar position="static">
-        <Toolbar>
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>COTELNET</Typography>
-          <Typography sx={{ mr: 2, display: { xs: 'none', sm: 'block' } }}>{session.fullName}</Typography>
-          <Button color="inherit" onClick={onLogout}>Cerrar sesión</Button>
-        </Toolbar>
-      </AppBar>
-      <Container sx={{ py: 5 }}>
+      <Container maxWidth="xl" sx={{ py: 5 }}>
         <Typography variant="h4" gutterBottom>Panel principal</Typography>
-        <Typography color="text.secondary" sx={{ mb: 4 }}>Base inicial de la nueva plataforma COTELNET.</Typography>
+        <Typography color="text.secondary" sx={{ mb: 4 }}>Módulos habilitados para {session.fullName}.</Typography>
         <Grid container spacing={3}>
-          {modules.map(([title, description]) => (
+          {visibleModules.map(([title, description]) => (
             <Grid key={title} size={{ xs: 12, sm: 6, md: 4 }}>
               <Card sx={{ height: '100%', borderTop: 4, borderColor: 'secondary.main' }}>
                 <CardContent>
@@ -35,7 +28,5 @@ export default function DashboardPage({ session, onLogout }) {
           ))}
         </Grid>
       </Container>
-    </Box>
   )
 }
-

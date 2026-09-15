@@ -14,7 +14,7 @@ public sealed class SystemController : ControllerBase
         username = User.Identity?.Name,
         fullName = User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value,
         role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value,
-        estafetaId = User.FindFirst("estafeta_id")?.Value
+        estafetaId = User.FindFirst("estafeta_id")?.Value,
+        permissions = User.FindAll("permission").Select(x => x.Value).OrderBy(x => x)
     });
 }
-

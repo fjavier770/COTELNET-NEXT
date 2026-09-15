@@ -1,5 +1,7 @@
 using System.Text;
 using CotelNet.Application.Abstractions;
+using CotelNet.Application.Administration;
+using CotelNet.Infrastructure.Administration;
 using CotelNet.Infrastructure.Auth;
 using CotelNet.Infrastructure.Persistence;
 using CotelNet.Infrastructure.Repositories;
@@ -28,6 +30,7 @@ public static class DependencyInjection
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
+        services.AddScoped<IAdministrationService, AdministrationService>();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
@@ -45,8 +48,11 @@ public static class DependencyInjection
                 };
             });
 
-        services.AddAuthorization();
+        services.AddAuthorization(options =>
+        {
+            foreach (var permission in PermissionCodes.All)
+                options.AddPolicy(permission, policy => policy.RequireClaim("permission", permission));
+        });
         return services;
     }
 }
-

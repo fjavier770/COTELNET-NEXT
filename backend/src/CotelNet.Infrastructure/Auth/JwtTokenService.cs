@@ -14,14 +14,16 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options) : IJwtTokenSer
     {
         var settings = options.Value;
         var expires = DateTime.UtcNow.AddMinutes(settings.ExpirationMinutes);
-        var claims = new[]
+        var claims = new List<Claim>
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.UniqueName, user.Username),
             new Claim(ClaimTypes.Name, user.FullName),
-            new Claim(ClaimTypes.Role, user.Role),
+            new Claim(ClaimTypes.Role, user.Role.Name),
             new Claim("estafeta_id", user.EstafetaId?.ToString() ?? string.Empty)
         };
+
+        claims.AddRange(user.Role.RolePermissions.Select(x => new Claim("permission", x.Permission.Code)));
 
         var credentials = new SigningCredentials(
             new SymmetricSecurityKey(Encoding.UTF8.GetBytes(settings.Secret)),
@@ -37,4 +39,3 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options) : IJwtTokenSer
         return new TokenResult(new JwtSecurityTokenHandler().WriteToken(token), expires);
     }
 }
-

@@ -1,5 +1,12 @@
 const API_ROOT = '/api/v1'
 
+async function parseResponse(response) {
+  if (response.status === 204) return null
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(payload.message ?? 'No fue posible completar la operación.')
+  return payload
+}
+
 export async function login(username, password) {
   const response = await fetch(`${API_ROOT}/auth/login`, {
     method: 'POST',
@@ -7,11 +14,17 @@ export async function login(username, password) {
     body: JSON.stringify({ username, password }),
   })
 
-  if (!response.ok) {
-    const payload = await response.json().catch(() => ({}))
-    throw new Error(payload.message ?? 'No fue posible iniciar sesión.')
-  }
-
-  return response.json()
+  return parseResponse(response)
 }
 
+export async function apiRequest(path, token, options = {}) {
+  const response = await fetch(`${API_ROOT}${path}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...options.headers,
+    },
+  })
+  return parseResponse(response)
+}

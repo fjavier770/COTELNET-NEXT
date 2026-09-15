@@ -28,8 +28,9 @@ public sealed class LoginService(
             token.ExpiresAtUtc,
             user.Username,
             user.FullName,
-            user.Role,
-            user.EstafetaId);
+            user.Role.Name,
+            user.EstafetaId,
+            user.Role.RolePermissions.Select(x => x.Permission.Code).OrderBy(x => x).ToArray());
     }
 }
 
@@ -41,5 +42,5 @@ public sealed record LoginResponse(
     string Username,
     string FullName,
     string Role,
-    int? EstafetaId);
-
+    int? EstafetaId,
+    IReadOnlyCollection<string> Permissions);
