@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CotelNet.Domain/CotelNet.Domain.csproj" />
+    <Project Path="src/CotelNet.Application/CotelNet.Application.csproj" />
+    <Project Path="src/CotelNet.Infrastructure/CotelNet.Infrastructure.csproj" />
+    <Project Path="src/CotelNet.Api/CotelNet.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CotelNet.Tests/CotelNet.Tests.csproj" />
+  </Folder>
+</Solution>
+
