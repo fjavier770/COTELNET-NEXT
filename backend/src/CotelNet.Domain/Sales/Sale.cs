@@ -14,4 +14,5 @@ public sealed class Sale : Entity
     public decimal Total { get; private set; }
     public ICollection<SaleLine> Lines { get; private set; } = new List<SaleLine>();
     public ICollection<SalePayment> Payments { get; private set; } = new List<SalePayment>();
+    public Shipment? Shipment { get; private set; }
 }

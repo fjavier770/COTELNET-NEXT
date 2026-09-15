@@ -21,6 +21,11 @@ public sealed class CotelNetDbContext(DbContextOptions<CotelNetDbContext> option
     public DbSet<Sale> Sales => Set<Sale>();
     public DbSet<SaleLine> SaleLines => Set<SaleLine>();
     public DbSet<SalePayment> SalePayments => Set<SalePayment>();
+    public DbSet<Destination> Destinations => Set<Destination>();
+    public DbSet<WeightTariff> WeightTariffs => Set<WeightTariff>();
+    public DbSet<SupplementaryService> SupplementaryServices => Set<SupplementaryService>();
+    public DbSet<Shipment> Shipments => Set<Shipment>();
+    public DbSet<ShipmentSupplementaryService> ShipmentSupplementaryServices => Set<ShipmentSupplementaryService>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -134,6 +139,38 @@ public sealed class CotelNetDbContext(DbContextOptions<CotelNetDbContext> option
         {
             entity.ToTable("SalePayments"); entity.HasKey(x => x.Id); entity.Property(x => x.Amount).HasPrecision(12, 2);
             entity.HasOne(x => x.PaymentMethod).WithMany().HasForeignKey(x => x.PaymentMethodId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<Destination>(entity =>
+        {
+            entity.ToTable("Destinations"); entity.HasKey(x => x.Id); entity.HasIndex(x => x.Code).IsUnique();
+            entity.Property(x => x.Code).HasMaxLength(20).IsRequired(); entity.Property(x => x.Name).HasMaxLength(120).IsRequired(); entity.Property(x => x.Zone).HasMaxLength(30).IsRequired();
+        });
+        modelBuilder.Entity<WeightTariff>(entity =>
+        {
+            entity.ToTable("WeightTariffs"); entity.HasKey(x => x.Id); entity.Property(x => x.DestinationZone).HasMaxLength(30).IsRequired(); entity.Property(x => x.Price).HasPrecision(12, 2);
+            entity.HasIndex(x => new { x.PostalServiceId, x.DestinationZone, x.MinimumWeightGrams, x.MaximumWeightGrams }).IsUnique();
+            entity.HasOne(x => x.PostalService).WithMany().HasForeignKey(x => x.PostalServiceId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<SupplementaryService>(entity =>
+        {
+            entity.ToTable("SupplementaryServices"); entity.HasKey(x => x.Id); entity.HasIndex(x => x.Code).IsUnique();
+            entity.Property(x => x.Code).HasMaxLength(30).IsRequired(); entity.Property(x => x.Name).HasMaxLength(140).IsRequired(); entity.Property(x => x.Price).HasPrecision(12, 2);
+        });
+        modelBuilder.Entity<Shipment>(entity =>
+        {
+            entity.ToTable("Shipments"); entity.HasKey(x => x.Id); entity.HasIndex(x => x.SaleId).IsUnique(); entity.HasIndex(x => x.TrackingNumber).IsUnique();
+            entity.Property(x => x.TrackingNumber).HasMaxLength(40).IsRequired(); entity.Property(x => x.BasePrice).HasPrecision(12, 2);
+            entity.Property(x => x.SenderName).HasMaxLength(160).IsRequired(); entity.Property(x => x.SenderDocument).HasMaxLength(40); entity.Property(x => x.SenderPhone).HasMaxLength(40); entity.Property(x => x.SenderEmail).HasMaxLength(160); entity.Property(x => x.SenderAddress).HasMaxLength(300).IsRequired();
+            entity.Property(x => x.RecipientName).HasMaxLength(160).IsRequired(); entity.Property(x => x.RecipientPhone).HasMaxLength(40); entity.Property(x => x.RecipientAddress).HasMaxLength(300).IsRequired();
+            entity.HasOne(x => x.Sale).WithOne(x => x.Shipment).HasForeignKey<Shipment>(x => x.SaleId);
+            entity.HasOne(x => x.PostalService).WithMany().HasForeignKey(x => x.PostalServiceId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Destination).WithMany().HasForeignKey(x => x.DestinationId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasMany(x => x.SupplementaryServices).WithOne().HasForeignKey(x => x.ShipmentId);
+        });
+        modelBuilder.Entity<ShipmentSupplementaryService>(entity =>
+        {
+            entity.ToTable("ShipmentSupplementaryServices"); entity.HasKey(x => x.Id); entity.Property(x => x.Description).HasMaxLength(140).IsRequired(); entity.Property(x => x.Price).HasPrecision(12, 2);
+            entity.HasOne<SupplementaryService>().WithMany().HasForeignKey(x => x.SupplementaryServiceId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

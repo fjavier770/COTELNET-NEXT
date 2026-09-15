@@ -2,6 +2,7 @@ using CotelNet.Application.Sales;
 using CotelNet.Domain.Sales;
 using CotelNet.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using QRCoder;
 
 namespace CotelNet.Infrastructure.Sales;
 
@@ -18,7 +19,10 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
         if (user.EstafetaId is int estafetaId) terminalsQuery = terminalsQuery.Where(x => x.EstafetaId == estafetaId);
         var terminals = await terminalsQuery.OrderBy(x => x.Code)
             .Select(x => new TerminalOptionDto(x.Id, x.Code, x.Name, x.EstafetaId, x.Estafeta.Nombre)).ToListAsync(cancellationToken);
-        return new SalesCatalogDto(tariffs, methods, terminals);
+        var postalServices = await db.PostalServices.AsNoTracking().Where(x => x.Active).OrderBy(x => x.Name).Select(x => new PostalServiceDto(x.Id, x.Code, x.Name)).ToListAsync(cancellationToken);
+        var destinations = await db.Destinations.AsNoTracking().Where(x => x.Active).OrderByDescending(x => x.IsDomestic).ThenBy(x => x.Name).Select(x => new DestinationDto(x.Id, x.Code, x.Name, x.Zone, x.IsDomestic)).ToListAsync(cancellationToken);
+        var supplementary = await db.SupplementaryServices.AsNoTracking().Where(x => x.Active).OrderBy(x => x.Name).Select(x => new SupplementaryServiceDto(x.Id, x.Code, x.Name, x.Price)).ToListAsync(cancellationToken);
+        return new SalesCatalogDto(tariffs, methods, terminals, postalServices, destinations, supplementary);
     }
 
     public async Task<CashSessionDto?> GetCurrentCashAsync(int userId, CancellationToken cancellationToken)
@@ -68,6 +72,43 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
         return await GetSaleDtoAsync(sale.Id, cancellationToken);
     }
 
+    public async Task<ShipmentQuoteDto> QuoteShipmentAsync(QuoteShipmentRequest request, CancellationToken cancellationToken)
+    {
+        var (tariff, supplementary) = await GetShipmentPricesAsync(request.PostalServiceId, request.DestinationId, request.WeightGrams, request.SupplementaryServiceIds, cancellationToken);
+        var supplementaryTotal = supplementary.Sum(x => x.Price);
+        return new ShipmentQuoteDto(tariff.Price, supplementaryTotal, tariff.Price + supplementaryTotal, $"{tariff.MinimumWeightGrams + 1}–{tariff.MaximumWeightGrams} g", supplementary.Select(ToDto).ToList());
+    }
+
+    public async Task<SaleDto> CreateShipmentAsync(int userId, CreateShipmentRequest request, CancellationToken cancellationToken)
+    {
+        Require(request.SenderName, "El nombre del remitente"); Require(request.SenderAddress, "La dirección del remitente"); Require(request.RecipientName, "El nombre del destinatario"); Require(request.RecipientAddress, "La dirección del destinatario");
+        var session = await db.CashSessions.SingleOrDefaultAsync(x => x.UserId == userId && x.IsOpen, cancellationToken) ?? throw new InvalidOperationException("Debes abrir la caja antes de registrar el envío.");
+        var terminal = await db.Terminals.AsNoTracking().SingleAsync(x => x.Id == session.TerminalId, cancellationToken);
+        var (tariff, supplementary) = await GetShipmentPricesAsync(request.PostalServiceId, request.DestinationId, request.WeightGrams, request.SupplementaryServiceIds, cancellationToken);
+        var service = await db.PostalServices.AsNoTracking().SingleAsync(x => x.Id == request.PostalServiceId, cancellationToken);
+        var destination = await db.Destinations.AsNoTracking().SingleAsync(x => x.Id == request.DestinationId, cancellationToken);
+        var paymentMethod = await db.PaymentMethods.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.PaymentMethodId && x.Active, cancellationToken) ?? throw new InvalidOperationException("La forma de pago no está disponible.");
+        var total = tariff.Price + supplementary.Sum(x => x.Price);
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var sale = new Sale($"F-{DateTime.UtcNow:yyyyMMddHHmmssfff}", userId, terminal.EstafetaId, session.Id, total);
+        sale.Lines.Add(new SaleLine(null, service.Code, $"{service.Name} · {destination.Name} · {request.WeightGrams} g", 1, tariff.Price));
+        foreach (var item in supplementary) sale.Lines.Add(new SaleLine(null, item.Code, item.Name, 1, item.Price));
+        sale.Payments.Add(new SalePayment(paymentMethod.Id, total));
+        db.Sales.Add(sale); await db.SaveChangesAsync(cancellationToken);
+        var shipment = new Shipment(sale.Id, $"CP{DateTime.UtcNow:yyMMddHHmmssfff}", service.Id, destination.Id, request.WeightGrams, tariff.Price,
+            request.SenderName, request.SenderDocument ?? string.Empty, request.SenderPhone ?? string.Empty, request.SenderEmail ?? string.Empty, request.SenderAddress,
+            request.RecipientName, request.RecipientPhone ?? string.Empty, request.RecipientAddress);
+        foreach (var item in supplementary) shipment.SupplementaryServices.Add(new ShipmentSupplementaryService(item.Id, item.Name, item.Price));
+        db.Shipments.Add(shipment); await db.SaveChangesAsync(cancellationToken); await transaction.CommitAsync(cancellationToken);
+        return await GetSaleDtoAsync(sale.Id, cancellationToken);
+    }
+
+    public async Task<SaleDto?> GetSaleAsync(int userId, int saleId, CancellationToken cancellationToken)
+    {
+        if (!await db.Sales.AnyAsync(x => x.Id == saleId && x.UserId == userId, cancellationToken)) return null;
+        return await GetSaleDtoAsync(saleId, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<SaleDto>> GetRecentSalesAsync(int userId, CancellationToken cancellationToken)
     {
         var ids = await db.Sales.AsNoTracking().Where(x => x.UserId == userId).OrderByDescending(x => x.Id).Take(10).Select(x => x.Id).ToListAsync(cancellationToken);
@@ -78,10 +119,18 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
 
     private async Task<SaleDto> GetSaleDtoAsync(int id, CancellationToken cancellationToken)
     {
-        var sale = await db.Sales.Include(x => x.Lines).Include(x => x.Payments).ThenInclude(x => x.PaymentMethod).AsNoTracking().SingleAsync(x => x.Id == id, cancellationToken);
+        var sale = await db.Sales.Include(x => x.Lines).Include(x => x.Payments).ThenInclude(x => x.PaymentMethod)
+            .Include(x => x.Shipment)!.ThenInclude(x => x!.PostalService).Include(x => x.Shipment)!.ThenInclude(x => x!.Destination)
+            .Include(x => x.Shipment)!.ThenInclude(x => x!.SupplementaryServices).AsNoTracking().SingleAsync(x => x.Id == id, cancellationToken);
+        ShipmentDto? shipment = null;
+        if (sale.Shipment is not null)
+            shipment = new ShipmentDto(sale.Shipment.TrackingNumber, sale.Shipment.WeightGrams, sale.Shipment.BasePrice, sale.Shipment.PostalService.Name, sale.Shipment.Destination.Name,
+                sale.Shipment.SenderName, sale.Shipment.SenderDocument, sale.Shipment.SenderPhone, sale.Shipment.SenderEmail, sale.Shipment.SenderAddress,
+                sale.Shipment.RecipientName, sale.Shipment.RecipientPhone, sale.Shipment.RecipientAddress,
+                sale.Shipment.SupplementaryServices.Select(x => new SupplementaryServiceDto(x.SupplementaryServiceId, string.Empty, x.Description, x.Price)).ToList(), CreateQrSvg(sale.Shipment.TrackingNumber));
         return new SaleDto(sale.Id, sale.InvoiceNumber, sale.CreatedAtUtc, sale.Total,
             sale.Lines.Select(x => new SaleLineDto(x.Code, x.Description, x.Quantity, x.UnitPrice, x.Total)).ToList(),
-            sale.Payments.Select(x => new PaymentSummaryDto(x.PaymentMethod.Name, x.Amount)).ToList());
+            sale.Payments.Select(x => new PaymentSummaryDto(x.PaymentMethod.Name, x.Amount)).ToList(), shipment);
     }
 
     private async Task<CashSessionDto> ToCashDtoAsync(CashSession session, CancellationToken cancellationToken)
@@ -91,5 +140,25 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
             .Select(x => new { x.Key.Name, x.Key.IsCash, Amount = x.Sum(p => p.Amount) }).ToListAsync(cancellationToken);
         var salesTotal = payments.Sum(x => x.Amount); var cashSales = payments.Where(x => x.IsCash).Sum(x => x.Amount);
         return new CashSessionDto(session.Id, session.IsOpen, terminal.Id, $"{terminal.Code} - {terminal.Name}", terminal.Estafeta.Nombre, session.OpeningAmount, session.OpenedAtUtc, session.ClosedAtUtc, salesTotal, cashSales, session.OpeningAmount + cashSales, session.DeclaredCash, session.Difference, payments.Select(x => new PaymentSummaryDto(x.Name, x.Amount)).ToList());
+    }
+
+    private async Task<(WeightTariff Tariff, List<SupplementaryService> Supplementary)> GetShipmentPricesAsync(int postalServiceId, int destinationId, int weightGrams, IReadOnlyCollection<int>? supplementaryIds, CancellationToken cancellationToken)
+    {
+        if (weightGrams <= 0) throw new InvalidOperationException("El peso debe ser mayor que cero.");
+        var destination = await db.Destinations.AsNoTracking().SingleOrDefaultAsync(x => x.Id == destinationId && x.Active, cancellationToken) ?? throw new InvalidOperationException("El destino no está disponible.");
+        var tariff = await db.WeightTariffs.AsNoTracking().Where(x => x.PostalServiceId == postalServiceId && x.DestinationZone == destination.Zone && x.Active && weightGrams > x.MinimumWeightGrams && weightGrams <= x.MaximumWeightGrams).OrderBy(x => x.MaximumWeightGrams).FirstOrDefaultAsync(cancellationToken)
+            ?? throw new InvalidOperationException("No existe una tarifa para el servicio, destino y peso seleccionados.");
+        var ids = (supplementaryIds ?? []).Distinct().ToArray();
+        var supplementary = await db.SupplementaryServices.AsNoTracking().Where(x => ids.Contains(x.Id) && x.Active).ToListAsync(cancellationToken);
+        if (supplementary.Count != ids.Length) throw new InvalidOperationException("Uno de los servicios suplementarios no está disponible.");
+        return (tariff, supplementary);
+    }
+
+    private static SupplementaryServiceDto ToDto(SupplementaryService x) => new(x.Id, x.Code, x.Name, x.Price);
+    private static void Require(string? value, string field) { if (string.IsNullOrWhiteSpace(value)) throw new InvalidOperationException($"{field} es obligatorio."); }
+    private static string CreateQrSvg(string value)
+    {
+        using var data = QRCodeGenerator.GenerateQrCode(value, QRCodeGenerator.ECCLevel.Q);
+        return new SvgQRCode(data).GetGraphic(4);
     }
 }

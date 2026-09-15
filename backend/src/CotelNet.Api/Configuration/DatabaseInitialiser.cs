@@ -100,6 +100,36 @@ public static class DatabaseInitialiser
         }
         await db.SaveChangesAsync();
 
+        if (!await db.Destinations.AnyAsync())
+        {
+            db.Destinations.AddRange(
+                new Destination("PA", "Panamá", "NACIONAL", true),
+                new Destination("CR", "Costa Rica", "ZONA1", false),
+                new Destination("CO", "Colombia", "ZONA1", false),
+                new Destination("US", "Estados Unidos", "ZONA2", false),
+                new Destination("ES", "España", "ZONA3", false));
+        }
+        if (!await db.SupplementaryServices.AnyAsync())
+        {
+            db.SupplementaryServices.AddRange(
+                new SupplementaryService("AR", "Aviso de recibo", 1.50m),
+                new SupplementaryService("CERT", "Certificación", 1.00m),
+                new SupplementaryService("SEG", "Seguro básico", 2.00m));
+        }
+        await db.SaveChangesAsync();
+
+        if (!await db.WeightTariffs.AnyAsync())
+        {
+            var services = await db.PostalServices.OrderBy(x => x.Id).ToListAsync();
+            var zones = new[] { (Code: "NACIONAL", Factor: 1m), (Code: "ZONA1", Factor: 2m), (Code: "ZONA2", Factor: 3m), (Code: "ZONA3", Factor: 4m) };
+            var bands = new[] { (Min: 0, Max: 500, Factor: 1m), (Min: 500, Max: 1000, Factor: 1.6m), (Min: 1000, Max: 2000, Factor: 2.4m), (Min: 2000, Max: 5000, Factor: 4m) };
+            for (var serviceIndex = 0; serviceIndex < services.Count; serviceIndex++)
+                foreach (var zone in zones)
+                    foreach (var band in bands)
+                        db.WeightTariffs.Add(new WeightTariff(services[serviceIndex].Id, zone.Code, band.Min, band.Max, decimal.Round((1m + serviceIndex * 1.5m) * zone.Factor * band.Factor, 2)));
+            await db.SaveChangesAsync();
+        }
+
         var users = scope.ServiceProvider.GetRequiredService<IUserRepository>();
         if (await users.AnyAsync(CancellationToken.None)) return;
 

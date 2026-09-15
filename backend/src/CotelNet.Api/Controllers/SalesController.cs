@@ -31,6 +31,22 @@ public sealed class SalesController(ISalesService service) : ControllerBase
     [Authorize(Policy = PermissionCodes.VentasAccess)]
     public Task<IActionResult> CreateSale(CreateSaleRequest request, CancellationToken cancellationToken) => ExecuteAsync(() => service.CreateSaleAsync(UserId(), request, cancellationToken));
 
+    [HttpPost("sales/quote")]
+    [Authorize(Policy = PermissionCodes.VentasAccess)]
+    public Task<IActionResult> QuoteShipment(QuoteShipmentRequest request, CancellationToken cancellationToken) => ExecuteAsync(() => service.QuoteShipmentAsync(request, cancellationToken));
+
+    [HttpPost("sales/shipments")]
+    [Authorize(Policy = PermissionCodes.VentasAccess)]
+    public Task<IActionResult> CreateShipment(CreateShipmentRequest request, CancellationToken cancellationToken) => ExecuteAsync(() => service.CreateShipmentAsync(UserId(), request, cancellationToken));
+
+    [HttpGet("sales/{id:int}")]
+    [Authorize(Policy = PermissionCodes.VentasAccess)]
+    public async Task<IActionResult> GetSale(int id, CancellationToken cancellationToken)
+    {
+        var sale = await service.GetSaleAsync(UserId(), id, cancellationToken);
+        return sale is null ? NotFound() : Ok(sale);
+    }
+
     [HttpGet("cash/current")]
     [Authorize(Policy = PermissionCodes.CajaAccess)]
     public async Task<IActionResult> CurrentCash(CancellationToken cancellationToken) => Ok(await service.GetCurrentCashAsync(UserId(), cancellationToken));
