@@ -1,5 +1,6 @@
 using CotelNet.Domain.Estafetas;
 using CotelNet.Domain.Users;
+using CotelNet.Domain.Sales;
 using Microsoft.EntityFrameworkCore;
 
 namespace CotelNet.Infrastructure.Persistence;
@@ -12,6 +13,14 @@ public sealed class CotelNetDbContext(DbContextOptions<CotelNetDbContext> option
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<Estafeta> Estafetas => Set<Estafeta>();
     public DbSet<Terminal> Terminals => Set<Terminal>();
+    public DbSet<Product> Products => Set<Product>();
+    public DbSet<PostalService> PostalServices => Set<PostalService>();
+    public DbSet<Tariff> Tariffs => Set<Tariff>();
+    public DbSet<PaymentMethod> PaymentMethods => Set<PaymentMethod>();
+    public DbSet<CashSession> CashSessions => Set<CashSession>();
+    public DbSet<Sale> Sales => Set<Sale>();
+    public DbSet<SaleLine> SaleLines => Set<SaleLine>();
+    public DbSet<SalePayment> SalePayments => Set<SalePayment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -74,6 +83,57 @@ public sealed class CotelNetDbContext(DbContextOptions<CotelNetDbContext> option
             entity.Property(x => x.Name).HasMaxLength(120).IsRequired();
             entity.Property(x => x.MacAddress).HasMaxLength(30);
             entity.HasOne(x => x.Estafeta).WithMany().HasForeignKey(x => x.EstafetaId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Product>(entity =>
+        {
+            entity.ToTable("Products"); entity.HasKey(x => x.Id); entity.HasIndex(x => x.Code).IsUnique();
+            entity.Property(x => x.Code).HasMaxLength(30).IsRequired(); entity.Property(x => x.Name).HasMaxLength(150).IsRequired();
+        });
+        modelBuilder.Entity<PostalService>(entity =>
+        {
+            entity.ToTable("PostalServices"); entity.HasKey(x => x.Id); entity.HasIndex(x => x.Code).IsUnique();
+            entity.Property(x => x.Code).HasMaxLength(30).IsRequired(); entity.Property(x => x.Name).HasMaxLength(150).IsRequired();
+        });
+        modelBuilder.Entity<Tariff>(entity =>
+        {
+            entity.ToTable("Tariffs"); entity.HasKey(x => x.Id); entity.HasIndex(x => x.Code).IsUnique();
+            entity.Property(x => x.Code).HasMaxLength(30).IsRequired(); entity.Property(x => x.Description).HasMaxLength(180).IsRequired(); entity.Property(x => x.Price).HasPrecision(12, 2);
+            entity.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.PostalService).WithMany().HasForeignKey(x => x.PostalServiceId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<PaymentMethod>(entity =>
+        {
+            entity.ToTable("PaymentMethods"); entity.HasKey(x => x.Id); entity.HasIndex(x => x.Code).IsUnique();
+            entity.Property(x => x.Code).HasMaxLength(30).IsRequired(); entity.Property(x => x.Name).HasMaxLength(100).IsRequired();
+        });
+        modelBuilder.Entity<CashSession>(entity =>
+        {
+            entity.ToTable("CashSessions"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.OpeningAmount).HasPrecision(12, 2); entity.Property(x => x.ExpectedCash).HasPrecision(12, 2); entity.Property(x => x.DeclaredCash).HasPrecision(12, 2); entity.Property(x => x.Difference).HasPrecision(12, 2);
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Terminal>().WithMany().HasForeignKey(x => x.TerminalId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<Sale>(entity =>
+        {
+            entity.ToTable("Sales"); entity.HasKey(x => x.Id); entity.HasIndex(x => x.InvoiceNumber).IsUnique();
+            entity.Property(x => x.InvoiceNumber).HasMaxLength(40).IsRequired(); entity.Property(x => x.Total).HasPrecision(12, 2);
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Estafeta>().WithMany().HasForeignKey(x => x.EstafetaId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<CashSession>().WithMany().HasForeignKey(x => x.CashSessionId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.SaleId);
+            entity.HasMany(x => x.Payments).WithOne(x => x.Sale).HasForeignKey(x => x.SaleId);
+        });
+        modelBuilder.Entity<SaleLine>(entity =>
+        {
+            entity.ToTable("SaleLines"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.Code).HasMaxLength(30).IsRequired(); entity.Property(x => x.Description).HasMaxLength(180).IsRequired(); entity.Property(x => x.UnitPrice).HasPrecision(12, 2); entity.Property(x => x.Total).HasPrecision(12, 2);
+            entity.HasOne<Tariff>().WithMany().HasForeignKey(x => x.TariffId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<SalePayment>(entity =>
+        {
+            entity.ToTable("SalePayments"); entity.HasKey(x => x.Id); entity.Property(x => x.Amount).HasPrecision(12, 2);
+            entity.HasOne(x => x.PaymentMethod).WithMany().HasForeignKey(x => x.PaymentMethodId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

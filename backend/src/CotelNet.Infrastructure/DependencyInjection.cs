@@ -5,6 +5,8 @@ using CotelNet.Infrastructure.Administration;
 using CotelNet.Infrastructure.Auth;
 using CotelNet.Infrastructure.Persistence;
 using CotelNet.Infrastructure.Repositories;
+using CotelNet.Application.Sales;
+using CotelNet.Infrastructure.Sales;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -31,6 +33,7 @@ public static class DependencyInjection
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IAdministrationService, AdministrationService>();
+        services.AddScoped<ISalesService, SalesService>();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>

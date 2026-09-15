@@ -5,6 +5,8 @@ import { Link, Outlet, useLocation } from 'react-router'
 const drawerWidth = 250
 const navigation = [
   { label: 'Panel principal', path: '/', permission: 'dashboard.view' },
+  { label: 'Ventas', path: '/ventas', permission: 'ventas.access' },
+  { label: 'Caja', path: '/caja', permission: 'caja.access' },
   { label: 'Usuarios', path: '/administracion/usuarios', permission: 'users.manage' },
   { label: 'Roles y permisos', path: '/administracion/roles', permission: 'roles.manage' },
   { label: 'Estafetas', path: '/administracion/estafetas', permission: 'estafetas.manage' },

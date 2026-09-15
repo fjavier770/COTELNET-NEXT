@@ -2,6 +2,7 @@ using CotelNet.Application.Abstractions;
 using CotelNet.Application.Administration;
 using CotelNet.Domain.Estafetas;
 using CotelNet.Domain.Users;
+using CotelNet.Domain.Sales;
 using CotelNet.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -63,6 +64,39 @@ public static class DatabaseInitialiser
         {
             central = new Estafeta("000", "Administración Central");
             db.Estafetas.Add(central);
+        }
+        await db.SaveChangesAsync();
+
+        if (!await db.Terminals.AnyAsync())
+        {
+            db.Terminals.Add(new Terminal("T-000-01", "Caja principal", null, central.Id));
+            await db.SaveChangesAsync();
+        }
+
+        if (!await db.PaymentMethods.AnyAsync())
+        {
+            db.PaymentMethods.AddRange(
+                new PaymentMethod("EFECTIVO", "Efectivo", true),
+                new PaymentMethod("TARJETA", "Tarjeta", false),
+                new PaymentMethod("TRANSFERENCIA", "Transferencia", false));
+        }
+
+        if (!await db.Tariffs.AnyAsync())
+        {
+            var stamp = new Product("SELLO-050", "Sello postal B/.0.50");
+            var envelope = new Product("SOBRE-M", "Sobre manila");
+            var ordinary = new PostalService("CORR-NAC", "Correo nacional ordinario");
+            var certified = new PostalService("CERT-NAC", "Correo nacional certificado");
+            var express = new PostalService("EMS-NAC", "EMS nacional");
+            db.Products.AddRange(stamp, envelope);
+            db.PostalServices.AddRange(ordinary, certified, express);
+            await db.SaveChangesAsync();
+            db.Tariffs.AddRange(
+                new Tariff("SELLO-050", stamp.Name, 0.50m, productId: stamp.Id),
+                new Tariff("SOBRE-M", envelope.Name, 0.75m, productId: envelope.Id),
+                new Tariff("CORR-NAC", ordinary.Name, 1.00m, postalServiceId: ordinary.Id),
+                new Tariff("CERT-NAC", certified.Name, 2.50m, postalServiceId: certified.Id),
+                new Tariff("EMS-NAC", express.Name, 5.00m, postalServiceId: express.Id));
         }
         await db.SaveChangesAsync();
 
