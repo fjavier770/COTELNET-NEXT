@@ -1,7 +1,7 @@
 using CotelNet.Api.Configuration;
 using CotelNet.Application.Auth;
 using CotelNet.Infrastructure;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,4 +36,3 @@ app.MapHealthChecks("/health");
 
 await app.InitialiseDatabaseAsync();
 await app.RunAsync();
-
