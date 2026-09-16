@@ -186,7 +186,7 @@ public sealed class LegacyCatalogImportService(CotelNetDbContext db, IConfigurat
             INNER JOIN Tarifas T ON T.servicioTipoID = ST.servicioTipoID AND T.activo = 1
             WHERE S.activo = 1 AND SC.activo = 1 AND ST.activo = 1
               AND SC.ventaTipoID IN ('ENVIO_POSTAL','EXPRESO_POSTAL','EXPORTA_FACIL')
-            ORDER BY SC.nombreCategoria, ST.nombreTipo, V.nombreViaEncaminamiento
+            ORDER BY SC.nombreCategoria, ST.nombreTipo, T.viaEncaminamientoID
             """, r => new LegacyService(r.GetInt32(0), r.GetString(1), r.GetString(2), r.GetInt32(3), r.GetString(4)), token);
 
     private static async Task<List<LegacyCountry>> ReadCountriesAsync(SqlConnection connection, CancellationToken token) =>
