@@ -154,13 +154,11 @@ public static class DatabaseInitialiser
         // de desarrollo creados antes de incorporar el prefijo S10.
         await db.Database.ExecuteSqlRawAsync("""
             IF COL_LENGTH('PostalServices', 'S10Prefix') IS NULL
-            BEGIN
-                ALTER TABLE PostalServices ADD S10Prefix nvarchar(2) NULL;
-                UPDATE PostalServices
-                SET S10Prefix = CASE WHEN Code LIKE 'EMS%' THEN 'EE' WHEN Code LIKE 'CERT%' THEN 'RR' ELSE 'RT' END;
-                ALTER TABLE PostalServices ALTER COLUMN S10Prefix nvarchar(2) NOT NULL;
-            END
-            ALTER TABLE PostalServices ALTER COLUMN S10Prefix nvarchar(2) NULL;
+                EXEC(N'ALTER TABLE PostalServices ADD S10Prefix nvarchar(2) NULL');
+            EXEC(N'UPDATE PostalServices
+                   SET S10Prefix = CASE WHEN Code LIKE ''EMS%'' THEN ''EE'' WHEN Code LIKE ''CERT%'' THEN ''RR'' ELSE ''RT'' END
+                   WHERE S10Prefix IS NULL');
+            EXEC(N'ALTER TABLE PostalServices ALTER COLUMN S10Prefix nvarchar(2) NULL');
             IF COL_LENGTH('PostalServices', 'LegacyServiceTypeId') IS NULL ALTER TABLE PostalServices ADD LegacyServiceTypeId int NULL;
             IF COL_LENGTH('PostalServices', 'LegacyRouteId') IS NULL ALTER TABLE PostalServices ADD LegacyRouteId int NULL;
             IF COL_LENGTH('Destinations', 'LegacyCountryId') IS NULL ALTER TABLE Destinations ADD LegacyCountryId int NULL;
