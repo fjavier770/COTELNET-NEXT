@@ -15,6 +15,7 @@ public static class DatabaseInitialiser
         await using var scope = app.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<CotelNetDbContext>();
         await db.Database.EnsureCreatedAsync();
+        await EnsurePrototypeSchemaCompatibilityAsync(db);
 
         var permissionDefinitions = new[]
         {
@@ -86,9 +87,9 @@ public static class DatabaseInitialiser
         {
             var stamp = new Product("SELLO-050", "Sello postal B/.0.50");
             var envelope = new Product("SOBRE-M", "Sobre manila");
-            var ordinary = new PostalService("CORR-NAC", "Correo nacional ordinario");
-            var certified = new PostalService("CERT-NAC", "Correo nacional certificado");
-            var express = new PostalService("EMS-NAC", "EMS nacional");
+            var ordinary = new PostalService("CORR-NAC", "Correo nacional ordinario", "RT");
+            var certified = new PostalService("CERT-NAC", "Correo nacional certificado", "RR");
+            var express = new PostalService("EMS-NAC", "EMS nacional", "EE");
             db.Products.AddRange(stamp, envelope);
             db.PostalServices.AddRange(ordinary, certified, express);
             await db.SaveChangesAsync();
@@ -145,5 +146,20 @@ public static class DatabaseInitialiser
         admin.AssignEstafeta(central.Id);
         await users.AddAsync(admin, CancellationToken.None);
         await users.SaveChangesAsync(CancellationToken.None);
+    }
+
+    private static async Task EnsurePrototypeSchemaCompatibilityAsync(CotelNetDbContext db)
+    {
+        // EnsureCreated no modifica una base existente. Este bloque mantiene los entornos Docker
+        // de desarrollo creados antes de incorporar el prefijo S10.
+        await db.Database.ExecuteSqlRawAsync("""
+            IF COL_LENGTH('PostalServices', 'S10Prefix') IS NULL
+            BEGIN
+                ALTER TABLE PostalServices ADD S10Prefix nvarchar(2) NULL;
+                UPDATE PostalServices
+                SET S10Prefix = CASE WHEN Code LIKE 'EMS%' THEN 'EE' WHEN Code LIKE 'CERT%' THEN 'RR' ELSE 'RT' END;
+                ALTER TABLE PostalServices ALTER COLUMN S10Prefix nvarchar(2) NOT NULL;
+            END
+            """);
     }
 }

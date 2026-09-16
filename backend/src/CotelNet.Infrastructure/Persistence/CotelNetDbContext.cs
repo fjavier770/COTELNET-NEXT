@@ -98,7 +98,7 @@ public sealed class CotelNetDbContext(DbContextOptions<CotelNetDbContext> option
         modelBuilder.Entity<PostalService>(entity =>
         {
             entity.ToTable("PostalServices"); entity.HasKey(x => x.Id); entity.HasIndex(x => x.Code).IsUnique();
-            entity.Property(x => x.Code).HasMaxLength(30).IsRequired(); entity.Property(x => x.Name).HasMaxLength(150).IsRequired();
+            entity.Property(x => x.Code).HasMaxLength(30).IsRequired(); entity.Property(x => x.Name).HasMaxLength(150).IsRequired(); entity.Property(x => x.S10Prefix).HasMaxLength(2).IsRequired();
         });
         modelBuilder.Entity<Tariff>(entity =>
         {

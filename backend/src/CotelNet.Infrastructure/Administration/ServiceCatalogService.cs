@@ -8,19 +8,19 @@ namespace CotelNet.Infrastructure.Administration;
 public sealed class ServiceCatalogService(CotelNetDbContext db) : IServiceCatalogService
 {
     public async Task<IReadOnlyList<PostalServiceAdminDto>> GetPostalServicesAsync(CancellationToken cancellationToken) =>
-        await db.PostalServices.AsNoTracking().OrderBy(x => x.Name).Select(x => new PostalServiceAdminDto(x.Id, x.Code, x.Name, x.Active)).ToListAsync(cancellationToken);
+        await db.PostalServices.AsNoTracking().OrderBy(x => x.Name).Select(x => new PostalServiceAdminDto(x.Id, x.Code, x.Name, x.S10Prefix, x.Active)).ToListAsync(cancellationToken);
 
     public async Task<PostalServiceAdminDto> CreatePostalServiceAsync(SavePostalServiceRequest request, CancellationToken cancellationToken)
     {
         ValidateText(request.Code, request.Name); await EnsureServiceCodeAsync(null, request.Code, cancellationToken);
-        var entity = new PostalService(request.Code, request.Name); if (!request.Active) entity.Update(request.Code, request.Name, false);
+        var entity = new PostalService(request.Code, request.Name, request.S10Prefix); if (!request.Active) entity.Update(request.Code, request.Name, request.S10Prefix, false);
         db.PostalServices.Add(entity); await db.SaveChangesAsync(cancellationToken); return ToDto(entity);
     }
 
     public async Task<PostalServiceAdminDto?> UpdatePostalServiceAsync(int id, SavePostalServiceRequest request, CancellationToken cancellationToken)
     {
         ValidateText(request.Code, request.Name); var entity = await db.PostalServices.FindAsync([id], cancellationToken); if (entity is null) return null;
-        await EnsureServiceCodeAsync(id, request.Code, cancellationToken); entity.Update(request.Code, request.Name, request.Active); await db.SaveChangesAsync(cancellationToken); return ToDto(entity);
+        await EnsureServiceCodeAsync(id, request.Code, cancellationToken); entity.Update(request.Code, request.Name, request.S10Prefix, request.Active); await db.SaveChangesAsync(cancellationToken); return ToDto(entity);
     }
 
     public async Task<IReadOnlyList<DestinationAdminDto>> GetDestinationsAsync(CancellationToken cancellationToken) =>
@@ -90,7 +90,7 @@ public sealed class ServiceCatalogService(CotelNetDbContext db) : IServiceCatalo
     private static void ValidateText(string code, string name) { if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(name)) throw new InvalidOperationException("El código y el nombre son obligatorios."); }
     private static void ValidateDestination(SaveDestinationRequest request) { ValidateText(request.Code, request.Name); if (string.IsNullOrWhiteSpace(request.Zone)) throw new InvalidOperationException("La zona tarifaria es obligatoria."); }
     private static void ValidatePrice(decimal price) { if (price < 0) throw new InvalidOperationException("El precio no puede ser negativo."); }
-    private static PostalServiceAdminDto ToDto(PostalService x) => new(x.Id, x.Code, x.Name, x.Active);
+    private static PostalServiceAdminDto ToDto(PostalService x) => new(x.Id, x.Code, x.Name, x.S10Prefix, x.Active);
     private static DestinationAdminDto ToDto(Destination x) => new(x.Id, x.Code, x.Name, x.Zone, x.IsDomestic, x.Active);
     private static WeightTariffAdminDto ToDto(WeightTariff x, string service) => new(x.Id, x.PostalServiceId, service, x.DestinationZone, x.MinimumWeightGrams, x.MaximumWeightGrams, x.Price, x.Active);
     private static SupplementaryServiceAdminDto ToDto(SupplementaryService x) => new(x.Id, x.Code, x.Name, x.Price, x.Active);

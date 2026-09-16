@@ -1,7 +1,7 @@
 namespace CotelNet.Application.Administration;
 
-public sealed record PostalServiceAdminDto(int Id, string Code, string Name, bool Active);
-public sealed record SavePostalServiceRequest(string Code, string Name, bool Active = true);
+public sealed record PostalServiceAdminDto(int Id, string Code, string Name, string S10Prefix, bool Active);
+public sealed record SavePostalServiceRequest(string Code, string Name, string S10Prefix, bool Active = true);
 public sealed record DestinationAdminDto(int Id, string Code, string Name, string Zone, bool IsDomestic, bool Active);
 public sealed record SaveDestinationRequest(string Code, string Name, string Zone, bool IsDomestic, bool Active = true);
 public sealed record WeightTariffAdminDto(int Id, int PostalServiceId, string PostalService, string DestinationZone, int MinimumWeightGrams, int MaximumWeightGrams, decimal Price, bool Active);

@@ -2,7 +2,8 @@ using CotelNet.Application.Sales;
 using CotelNet.Domain.Sales;
 using CotelNet.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using QRCoder;
+using System.Data;
+using System.Text;
 
 namespace CotelNet.Infrastructure.Sales;
 
@@ -19,10 +20,14 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
         if (user.EstafetaId is int estafetaId) terminalsQuery = terminalsQuery.Where(x => x.EstafetaId == estafetaId);
         var terminals = await terminalsQuery.OrderBy(x => x.Code)
             .Select(x => new TerminalOptionDto(x.Id, x.Code, x.Name, x.EstafetaId, x.Estafeta.Nombre)).ToListAsync(cancellationToken);
-        var postalServices = await db.PostalServices.AsNoTracking().Where(x => x.Active).OrderBy(x => x.Name).Select(x => new PostalServiceDto(x.Id, x.Code, x.Name)).ToListAsync(cancellationToken);
+        var postalServices = await db.PostalServices.AsNoTracking().Where(x => x.Active).OrderBy(x => x.Name).Select(x => new PostalServiceDto(x.Id, x.Code, x.Name, x.S10Prefix)).ToListAsync(cancellationToken);
         var destinations = await db.Destinations.AsNoTracking().Where(x => x.Active).OrderByDescending(x => x.IsDomestic).ThenBy(x => x.Name).Select(x => new DestinationDto(x.Id, x.Code, x.Name, x.Zone, x.IsDomestic)).ToListAsync(cancellationToken);
         var supplementary = await db.SupplementaryServices.AsNoTracking().Where(x => x.Active).OrderBy(x => x.Name).Select(x => new SupplementaryServiceDto(x.Id, x.Code, x.Name, x.Price)).ToListAsync(cancellationToken);
-        return new SalesCatalogDto(tariffs, methods, terminals, postalServices, destinations, supplementary);
+        var limits = await db.WeightTariffs.AsNoTracking().Where(x => x.Active)
+            .GroupBy(x => new { x.PostalServiceId, x.DestinationZone })
+            .Select(x => new ServiceWeightLimitDto(x.Key.PostalServiceId, x.Key.DestinationZone, x.Max(item => item.MaximumWeightGrams)))
+            .ToListAsync(cancellationToken);
+        return new SalesCatalogDto(tariffs, methods, terminals, postalServices, destinations, supplementary, limits);
     }
 
     public async Task<CashSessionDto?> GetCurrentCashAsync(int userId, CancellationToken cancellationToken)
@@ -89,13 +94,15 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
         var destination = await db.Destinations.AsNoTracking().SingleAsync(x => x.Id == request.DestinationId, cancellationToken);
         var paymentMethod = await db.PaymentMethods.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.PaymentMethodId && x.Active, cancellationToken) ?? throw new InvalidOperationException("La forma de pago no está disponible.");
         var total = tariff.Price + supplementary.Sum(x => x.Price);
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var sale = new Sale($"F-{DateTime.UtcNow:yyyyMMddHHmmssfff}", userId, terminal.EstafetaId, session.Id, total);
         sale.Lines.Add(new SaleLine(null, service.Code, $"{service.Name} · {destination.Name} · {request.WeightGrams} g", 1, tariff.Price));
         foreach (var item in supplementary) sale.Lines.Add(new SaleLine(null, item.Code, item.Name, 1, item.Price));
         sale.Payments.Add(new SalePayment(paymentMethod.Id, total));
         db.Sales.Add(sale); await db.SaveChangesAsync(cancellationToken);
-        var shipment = new Shipment(sale.Id, $"CP{DateTime.UtcNow:yyMMddHHmmssfff}", service.Id, destination.Id, request.WeightGrams, tariff.Price,
+        var estafeta = await db.Estafetas.AsNoTracking().SingleAsync(x => x.Id == terminal.EstafetaId, cancellationToken);
+        var trackingNumber = await GenerateS10Async(service.S10Prefix, estafeta.Codigo, cancellationToken);
+        var shipment = new Shipment(sale.Id, trackingNumber, service.Id, destination.Id, request.WeightGrams, tariff.Price,
             request.SenderName, request.SenderDocument ?? string.Empty, request.SenderPhone ?? string.Empty, request.SenderEmail ?? string.Empty, request.SenderAddress,
             request.RecipientName, request.RecipientPhone ?? string.Empty, request.RecipientAddress);
         foreach (var item in supplementary) shipment.SupplementaryServices.Add(new ShipmentSupplementaryService(item.Id, item.Name, item.Price));
@@ -127,10 +134,17 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
             shipment = new ShipmentDto(sale.Shipment.TrackingNumber, sale.Shipment.WeightGrams, sale.Shipment.BasePrice, sale.Shipment.PostalService.Name, sale.Shipment.Destination.Name,
                 sale.Shipment.SenderName, sale.Shipment.SenderDocument, sale.Shipment.SenderPhone, sale.Shipment.SenderEmail, sale.Shipment.SenderAddress,
                 sale.Shipment.RecipientName, sale.Shipment.RecipientPhone, sale.Shipment.RecipientAddress,
-                sale.Shipment.SupplementaryServices.Select(x => new SupplementaryServiceDto(x.SupplementaryServiceId, string.Empty, x.Description, x.Price)).ToList(), CreateQrSvg(sale.Shipment.TrackingNumber));
+                sale.Shipment.SupplementaryServices.Select(x => new SupplementaryServiceDto(x.SupplementaryServiceId, string.Empty, x.Description, x.Price)).ToList(), CreateCode39Svg(sale.Shipment.TrackingNumber));
+        var receipt = await (from user in db.Users.AsNoTracking()
+                             join office in db.Estafetas.AsNoTracking() on sale.EstafetaId equals office.Id
+                             join cash in db.CashSessions.AsNoTracking() on sale.CashSessionId equals cash.Id
+                             join terminal in db.Terminals.AsNoTracking() on cash.TerminalId equals terminal.Id
+                             where user.Id == sale.UserId
+                             select new ReceiptContextDto(user.FullName, office.Codigo, office.Nombre, terminal.Code))
+            .SingleAsync(cancellationToken);
         return new SaleDto(sale.Id, sale.InvoiceNumber, sale.CreatedAtUtc, sale.Total,
             sale.Lines.Select(x => new SaleLineDto(x.Code, x.Description, x.Quantity, x.UnitPrice, x.Total)).ToList(),
-            sale.Payments.Select(x => new PaymentSummaryDto(x.PaymentMethod.Name, x.Amount)).ToList(), shipment);
+            sale.Payments.Select(x => new PaymentSummaryDto(x.PaymentMethod.Name, x.Amount)).ToList(), shipment, receipt);
     }
 
     private async Task<CashSessionDto> ToCashDtoAsync(CashSession session, CancellationToken cancellationToken)
@@ -146,8 +160,12 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
     {
         if (weightGrams <= 0) throw new InvalidOperationException("El peso debe ser mayor que cero.");
         var destination = await db.Destinations.AsNoTracking().SingleOrDefaultAsync(x => x.Id == destinationId && x.Active, cancellationToken) ?? throw new InvalidOperationException("El destino no está disponible.");
-        var tariff = await db.WeightTariffs.AsNoTracking().Where(x => x.PostalServiceId == postalServiceId && x.DestinationZone == destination.Zone && x.Active && weightGrams > x.MinimumWeightGrams && weightGrams <= x.MaximumWeightGrams).OrderBy(x => x.MaximumWeightGrams).FirstOrDefaultAsync(cancellationToken)
-            ?? throw new InvalidOperationException("No existe una tarifa para el servicio, destino y peso seleccionados.");
+        var serviceTariffs = db.WeightTariffs.AsNoTracking().Where(x => x.PostalServiceId == postalServiceId && x.DestinationZone == destination.Zone && x.Active);
+        var maximumWeight = await serviceTariffs.MaxAsync(x => (int?)x.MaximumWeightGrams, cancellationToken);
+        if (maximumWeight is null) throw new InvalidOperationException("No existe una tarifa para el servicio y destino seleccionados.");
+        if (weightGrams > maximumWeight) throw new InvalidOperationException($"El peso máximo permitido para este servicio y destino es {maximumWeight.Value / 1000m:0.000} kg.");
+        var tariff = await serviceTariffs.Where(x => weightGrams > x.MinimumWeightGrams && weightGrams <= x.MaximumWeightGrams).OrderBy(x => x.MaximumWeightGrams).FirstOrDefaultAsync(cancellationToken)
+            ?? throw new InvalidOperationException("No existe una tarifa para el rango de peso seleccionado.");
         var ids = (supplementaryIds ?? []).Distinct().ToArray();
         var supplementary = await db.SupplementaryServices.AsNoTracking().Where(x => ids.Contains(x.Id) && x.Active).ToListAsync(cancellationToken);
         if (supplementary.Count != ids.Length) throw new InvalidOperationException("Uno de los servicios suplementarios no está disponible.");
@@ -156,9 +174,52 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
 
     private static SupplementaryServiceDto ToDto(SupplementaryService x) => new(x.Id, x.Code, x.Name, x.Price);
     private static void Require(string? value, string field) { if (string.IsNullOrWhiteSpace(value)) throw new InvalidOperationException($"{field} es obligatorio."); }
-    private static string CreateQrSvg(string value)
+    private async Task<string> GenerateS10Async(string prefix, string officeCode, CancellationToken cancellationToken)
     {
-        using var data = QRCodeGenerator.GenerateQrCode(value, QRCodeGenerator.ECCLevel.Q);
-        return new SvgQRCode(data).GetGraphic(4);
+        var office = new string((officeCode ?? string.Empty).Where(char.IsDigit).ToArray());
+        if (office.Length > 4) office = office[^4..];
+        office = office.PadLeft(4, '0');
+        var start = prefix.Trim().ToUpperInvariant() + office;
+        var existing = await db.Shipments.AsNoTracking().Where(x => x.TrackingNumber.StartsWith(start) && x.TrackingNumber.EndsWith("PA"))
+            .Select(x => x.TrackingNumber).ToListAsync(cancellationToken);
+        var last = existing.Select(value => value.Length == 13 && int.TryParse(value.Substring(6, 4), out var number) ? number : 0).DefaultIfEmpty().Max();
+        if (last >= 9999) throw new InvalidOperationException($"Se agotó el rango anual de códigos S10 para la estafeta {office} y el prefijo {prefix}.");
+        return S10CodeGenerator.Generate(prefix, office, last + 1);
+    }
+
+    private static string CreateCode39Svg(string value)
+    {
+        const int narrow = 2;
+        const int wide = 5;
+        const int gap = 2;
+        const int height = 72;
+        var patterns = new Dictionary<char, string>
+        {
+            ['0']="nnnwwnwnn", ['1']="wnnwnnnnw", ['2']="nnwwnnnnw", ['3']="wnwwnnnnn", ['4']="nnnwwnnnw",
+            ['5']="wnnwwnnnn", ['6']="nnwwwnnnn", ['7']="nnnwnnwnw", ['8']="wnnwnnwnn", ['9']="nnwwnnwnn",
+            ['A']="wnnnnwnnw", ['B']="nnwnnwnnw", ['C']="wnwnnwnnn", ['D']="nnnnwwnnw", ['E']="wnnnwwnnn",
+            ['F']="nnwnwwnnn", ['G']="nnnnnwwnw", ['H']="wnnnnwwnn", ['I']="nnwnnwwnn", ['J']="nnnnwwwnn",
+            ['K']="wnnnnnnww", ['L']="nnwnnnnww", ['M']="wnwnnnnwn", ['N']="nnnnwnnww", ['O']="wnnnwnnwn",
+            ['P']="nnwnwnnwn", ['Q']="nnnnnnwww", ['R']="wnnnnnwwn", ['S']="nnwnnnwwn", ['T']="nnnnwnwwn",
+            ['U']="wwnnnnnnw", ['V']="nwwnnnnnw", ['W']="wwwnnnnnn", ['X']="nwnnwnnnw", ['Y']="wwnnwnnnn",
+            ['Z']="nwwnwnnnn", ['-']="nwnnnnwnw", ['.']="wwnnnnwnn", [' ']="nwwnnnwnn", ['$']="nwnwnwnnn",
+            ['/']="nwnwnnnwn", ['+']="nwnnnwnwn", ['%']="nnnwnwnwn", ['*']="nwnnwnwnn"
+        };
+        var encoded = $"*{value.Trim().ToUpperInvariant()}*";
+        var x = 12;
+        var bars = new StringBuilder();
+        foreach (var character in encoded)
+        {
+            if (!patterns.TryGetValue(character, out var pattern)) throw new InvalidOperationException("El código contiene caracteres no válidos para Code 39.");
+            for (var index = 0; index < pattern.Length; index++)
+            {
+                var width = pattern[index] == 'w' ? wide : narrow;
+                if (index % 2 == 0) bars.Append($"<rect x=\"{x}\" y=\"4\" width=\"{width}\" height=\"{height}\"/>");
+                x += width;
+            }
+            x += gap;
+        }
+        var widthTotal = x + 12;
+        return $"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {widthTotal} 96\" role=\"img\" aria-label=\"{value}\"><rect width=\"100%\" height=\"100%\" fill=\"white\"/>{bars}<text x=\"{widthTotal / 2}\" y=\"92\" font-family=\"monospace\" font-size=\"13\" text-anchor=\"middle\">{value}</text></svg>";
     }
 }
