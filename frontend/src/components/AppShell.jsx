@@ -11,6 +11,7 @@ const navigation = [
   { label: 'Roles y permisos', path: '/administracion/roles', permission: 'roles.manage' },
   { label: 'Estafetas', path: '/administracion/estafetas', permission: 'estafetas.manage' },
   { label: 'Terminales', path: '/administracion/terminales', permission: 'terminals.manage' },
+  { label: 'Servicios y tarifas', path: '/administracion/servicios', permission: 'services.manage' },
 ]
 
 export default function AppShell({ session, onLogout }) {

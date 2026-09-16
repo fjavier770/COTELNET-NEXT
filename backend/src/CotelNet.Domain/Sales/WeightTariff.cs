@@ -16,4 +16,7 @@ public sealed class WeightTariff : Entity
     public int MaximumWeightGrams { get; private set; }
     public decimal Price { get; private set; }
     public bool Active { get; private set; }
+
+    public void Update(int postalServiceId, string destinationZone, int minimumWeightGrams, int maximumWeightGrams, decimal price, bool active)
+    { PostalServiceId = postalServiceId; DestinationZone = destinationZone.Trim().ToUpperInvariant(); MinimumWeightGrams = minimumWeightGrams; MaximumWeightGrams = maximumWeightGrams; Price = price; Active = active; MarkUpdated(); }
 }

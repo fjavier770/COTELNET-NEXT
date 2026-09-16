@@ -7,6 +7,7 @@ public static class PermissionCodes
     public const string RolesManage = "roles.manage";
     public const string EstafetasManage = "estafetas.manage";
     public const string TerminalsManage = "terminals.manage";
+    public const string ServicesManage = "services.manage";
     public const string VentasAccess = "ventas.access";
     public const string EnviosAccess = "envios.access";
     public const string CajaAccess = "caja.access";
@@ -16,7 +17,7 @@ public static class PermissionCodes
 
     public static readonly string[] All =
     [
-        DashboardView, UsersManage, RolesManage, EstafetasManage, TerminalsManage,
+        DashboardView, UsersManage, RolesManage, EstafetasManage, TerminalsManage, ServicesManage,
         VentasAccess, EnviosAccess, CajaAccess, InventarioAccess, ApartadosAccess, ReportesAccess
     ];
 }

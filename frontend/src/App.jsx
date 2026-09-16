@@ -9,6 +9,7 @@ import RolesPage from './pages/RolesPage.jsx'
 import UsersPage from './pages/UsersPage.jsx'
 import SalesPage from './pages/SalesPage.jsx'
 import CashPage from './pages/CashPage.jsx'
+import ServiceMaintenancePage from './pages/ServiceMaintenancePage.jsx'
 
 const storageKey = 'cotelnet.session'
 
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="administracion/roles" element={<WithPermission session={session} permission="roles.manage"><RolesPage session={session} /></WithPermission>} />
         <Route path="administracion/estafetas" element={<WithPermission session={session} permission="estafetas.manage"><CatalogPage kind="estafetas" session={session} /></WithPermission>} />
         <Route path="administracion/terminales" element={<WithPermission session={session} permission="terminals.manage"><CatalogPage kind="terminals" session={session} /></WithPermission>} />
+        <Route path="administracion/servicios" element={<WithPermission session={session} permission="services.manage"><ServiceMaintenancePage session={session} /></WithPermission>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

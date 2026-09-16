@@ -33,6 +33,7 @@ public static class DependencyInjection
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IAdministrationService, AdministrationService>();
+        services.AddScoped<IServiceCatalogService, ServiceCatalogService>();
         services.AddScoped<ISalesService, SalesService>();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

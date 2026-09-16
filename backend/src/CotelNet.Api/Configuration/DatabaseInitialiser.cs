@@ -23,6 +23,7 @@ public static class DatabaseInitialiser
             (PermissionCodes.RolesManage, "Administrar roles y permisos", "Administración"),
             (PermissionCodes.EstafetasManage, "Administrar estafetas", "Administración"),
             (PermissionCodes.TerminalsManage, "Administrar terminales", "Administración"),
+            (PermissionCodes.ServicesManage, "Administrar servicios y tarifas", "Administración"),
             (PermissionCodes.VentasAccess, "Acceder a ventas", "Operación"),
             (PermissionCodes.EnviosAccess, "Acceder a envíos", "Operación"),
             (PermissionCodes.CajaAccess, "Acceder a caja", "Operación"),

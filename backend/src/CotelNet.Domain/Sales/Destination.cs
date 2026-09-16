@@ -12,4 +12,7 @@ public sealed class Destination : Entity
     public string Zone { get; private set; } = string.Empty;
     public bool IsDomestic { get; private set; }
     public bool Active { get; private set; }
+
+    public void Update(string code, string name, string zone, bool isDomestic, bool active)
+    { Code = code.Trim().ToUpperInvariant(); Name = name.Trim(); Zone = zone.Trim().ToUpperInvariant(); IsDomestic = isDomestic; Active = active; MarkUpdated(); }
 }
