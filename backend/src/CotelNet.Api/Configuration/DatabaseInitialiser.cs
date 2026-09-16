@@ -160,6 +160,24 @@ public static class DatabaseInitialiser
                 SET S10Prefix = CASE WHEN Code LIKE 'EMS%' THEN 'EE' WHEN Code LIKE 'CERT%' THEN 'RR' ELSE 'RT' END;
                 ALTER TABLE PostalServices ALTER COLUMN S10Prefix nvarchar(2) NOT NULL;
             END
+            ALTER TABLE PostalServices ALTER COLUMN S10Prefix nvarchar(2) NULL;
+            IF COL_LENGTH('PostalServices', 'LegacyServiceTypeId') IS NULL ALTER TABLE PostalServices ADD LegacyServiceTypeId int NULL;
+            IF COL_LENGTH('PostalServices', 'LegacyRouteId') IS NULL ALTER TABLE PostalServices ADD LegacyRouteId int NULL;
+            IF COL_LENGTH('Destinations', 'LegacyCountryId') IS NULL ALTER TABLE Destinations ADD LegacyCountryId int NULL;
+            IF COL_LENGTH('Destinations', 'LegacyProvinceId') IS NULL ALTER TABLE Destinations ADD LegacyProvinceId int NULL;
+            IF COL_LENGTH('WeightTariffs', 'LegacyTariffId') IS NULL ALTER TABLE WeightTariffs ADD LegacyTariffId int NULL;
+            IF COL_LENGTH('SupplementaryServices', 'LegacyId') IS NULL ALTER TABLE SupplementaryServices ADD LegacyId int NULL;
+            IF COL_LENGTH('SupplementaryServices', 'S10Prefix') IS NULL ALTER TABLE SupplementaryServices ADD S10Prefix nvarchar(2) NULL;
+            IF OBJECT_ID('TariffSupplementaryOptions', 'U') IS NULL
+            BEGIN
+                CREATE TABLE TariffSupplementaryOptions (
+                    LegacyTariffId int NOT NULL,
+                    SupplementaryServiceId int NOT NULL,
+                    PriceAdjustment decimal(12,2) NOT NULL,
+                    CONSTRAINT PK_TariffSupplementaryOptions PRIMARY KEY (LegacyTariffId, SupplementaryServiceId),
+                    CONSTRAINT FK_TariffSupplementaryOptions_SupplementaryServices FOREIGN KEY (SupplementaryServiceId) REFERENCES SupplementaryServices(Id)
+                );
+            END
             """);
     }
 }

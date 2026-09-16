@@ -5,9 +5,9 @@ namespace CotelNet.Domain.Sales;
 public sealed class WeightTariff : Entity
 {
     private WeightTariff() { }
-    public WeightTariff(int postalServiceId, string destinationZone, int minimumWeightGrams, int maximumWeightGrams, decimal price)
+    public WeightTariff(int postalServiceId, string destinationZone, int minimumWeightGrams, int maximumWeightGrams, decimal price, int? legacyTariffId = null)
     {
-        PostalServiceId = postalServiceId; DestinationZone = destinationZone.Trim().ToUpperInvariant(); MinimumWeightGrams = minimumWeightGrams; MaximumWeightGrams = maximumWeightGrams; Price = price; Active = true;
+        PostalServiceId = postalServiceId; DestinationZone = destinationZone.Trim().ToUpperInvariant(); MinimumWeightGrams = minimumWeightGrams; MaximumWeightGrams = maximumWeightGrams; Price = price; LegacyTariffId = legacyTariffId; Active = true;
     }
     public int PostalServiceId { get; private set; }
     public PostalService PostalService { get; private set; } = null!;
@@ -15,8 +15,9 @@ public sealed class WeightTariff : Entity
     public int MinimumWeightGrams { get; private set; }
     public int MaximumWeightGrams { get; private set; }
     public decimal Price { get; private set; }
+    public int? LegacyTariffId { get; private set; }
     public bool Active { get; private set; }
 
-    public void Update(int postalServiceId, string destinationZone, int minimumWeightGrams, int maximumWeightGrams, decimal price, bool active)
-    { PostalServiceId = postalServiceId; DestinationZone = destinationZone.Trim().ToUpperInvariant(); MinimumWeightGrams = minimumWeightGrams; MaximumWeightGrams = maximumWeightGrams; Price = price; Active = active; MarkUpdated(); }
+    public void Update(int postalServiceId, string destinationZone, int minimumWeightGrams, int maximumWeightGrams, decimal price, bool active, int? legacyTariffId = null)
+    { PostalServiceId = postalServiceId; DestinationZone = destinationZone.Trim().ToUpperInvariant(); MinimumWeightGrams = minimumWeightGrams; MaximumWeightGrams = maximumWeightGrams; Price = price; Active = active; LegacyTariffId = legacyTariffId; MarkUpdated(); }
 }

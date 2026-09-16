@@ -7,8 +7,13 @@ namespace CotelNet.Api.Controllers;
 [ApiController]
 [Authorize(Policy = PermissionCodes.ServicesManage)]
 [Route("api/v1/administration/service-catalog")]
-public sealed class ServiceCatalogController(IServiceCatalogService service) : ControllerBase
+public sealed class ServiceCatalogController(IServiceCatalogService service, ILegacyCatalogImportService legacyImport) : ControllerBase
 {
+    [HttpGet("legacy-import/status")]
+    public async Task<IActionResult> GetLegacyImportStatus(CancellationToken token) => Ok(new { configured = await legacyImport.IsConfiguredAsync(token) });
+    [HttpPost("legacy-import")]
+    public Task<IActionResult> ImportLegacyCatalog(CancellationToken token) => ExecuteAsync(() => legacyImport.ImportAsync(token));
+
     [HttpGet("postal-services")]
     public async Task<IActionResult> GetPostalServices(CancellationToken token) => Ok(await service.GetPostalServicesAsync(token));
     [HttpPost("postal-services")]

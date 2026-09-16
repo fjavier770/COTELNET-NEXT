@@ -24,6 +24,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__CotelNet: "Server=sqlserver,1433;Database=CotelNetNext;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=True"
+      ConnectionStrings__LegacyCotelNet: "${LEGACY_DB_CONNECTION_STRING:-}"
       Jwt__Secret: "${JWT_SECRET}"
       Jwt__Issuer: "${JWT_ISSUER:-CotelNet.Api}"
       Jwt__Audience: "${JWT_AUDIENCE:-CotelNet.Frontend}"
@@ -53,4 +54,3 @@ networks:
     driver: bridge
   coolify:
     external: true
-

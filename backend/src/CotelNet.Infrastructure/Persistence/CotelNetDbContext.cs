@@ -26,6 +26,7 @@ public sealed class CotelNetDbContext(DbContextOptions<CotelNetDbContext> option
     public DbSet<SupplementaryService> SupplementaryServices => Set<SupplementaryService>();
     public DbSet<Shipment> Shipments => Set<Shipment>();
     public DbSet<ShipmentSupplementaryService> ShipmentSupplementaryServices => Set<ShipmentSupplementaryService>();
+    public DbSet<TariffSupplementaryOption> TariffSupplementaryOptions => Set<TariffSupplementaryOption>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -98,7 +99,8 @@ public sealed class CotelNetDbContext(DbContextOptions<CotelNetDbContext> option
         modelBuilder.Entity<PostalService>(entity =>
         {
             entity.ToTable("PostalServices"); entity.HasKey(x => x.Id); entity.HasIndex(x => x.Code).IsUnique();
-            entity.Property(x => x.Code).HasMaxLength(30).IsRequired(); entity.Property(x => x.Name).HasMaxLength(150).IsRequired(); entity.Property(x => x.S10Prefix).HasMaxLength(2).IsRequired();
+            entity.Property(x => x.Code).HasMaxLength(30).IsRequired(); entity.Property(x => x.Name).HasMaxLength(150).IsRequired(); entity.Property(x => x.S10Prefix).HasMaxLength(2);
+            entity.HasIndex(x => new { x.LegacyServiceTypeId, x.LegacyRouteId }).IsUnique().HasFilter("[LegacyServiceTypeId] IS NOT NULL AND [LegacyRouteId] IS NOT NULL");
         });
         modelBuilder.Entity<Tariff>(entity =>
         {
@@ -144,6 +146,8 @@ public sealed class CotelNetDbContext(DbContextOptions<CotelNetDbContext> option
         {
             entity.ToTable("Destinations"); entity.HasKey(x => x.Id); entity.HasIndex(x => x.Code).IsUnique();
             entity.Property(x => x.Code).HasMaxLength(20).IsRequired(); entity.Property(x => x.Name).HasMaxLength(120).IsRequired(); entity.Property(x => x.Zone).HasMaxLength(30).IsRequired();
+            entity.HasIndex(x => x.LegacyCountryId).IsUnique().HasFilter("[LegacyCountryId] IS NOT NULL");
+            entity.HasIndex(x => x.LegacyProvinceId).IsUnique().HasFilter("[LegacyProvinceId] IS NOT NULL");
         });
         modelBuilder.Entity<WeightTariff>(entity =>
         {
@@ -155,6 +159,7 @@ public sealed class CotelNetDbContext(DbContextOptions<CotelNetDbContext> option
         {
             entity.ToTable("SupplementaryServices"); entity.HasKey(x => x.Id); entity.HasIndex(x => x.Code).IsUnique();
             entity.Property(x => x.Code).HasMaxLength(30).IsRequired(); entity.Property(x => x.Name).HasMaxLength(140).IsRequired(); entity.Property(x => x.Price).HasPrecision(12, 2);
+            entity.Property(x => x.S10Prefix).HasMaxLength(2); entity.HasIndex(x => x.LegacyId).IsUnique().HasFilter("[LegacyId] IS NOT NULL");
         });
         modelBuilder.Entity<Shipment>(entity =>
         {
@@ -171,6 +176,12 @@ public sealed class CotelNetDbContext(DbContextOptions<CotelNetDbContext> option
         {
             entity.ToTable("ShipmentSupplementaryServices"); entity.HasKey(x => x.Id); entity.Property(x => x.Description).HasMaxLength(140).IsRequired(); entity.Property(x => x.Price).HasPrecision(12, 2);
             entity.HasOne<SupplementaryService>().WithMany().HasForeignKey(x => x.SupplementaryServiceId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<TariffSupplementaryOption>(entity =>
+        {
+            entity.ToTable("TariffSupplementaryOptions"); entity.HasKey(x => new { x.LegacyTariffId, x.SupplementaryServiceId });
+            entity.Property(x => x.PriceAdjustment).HasPrecision(12, 2);
+            entity.HasOne(x => x.SupplementaryService).WithMany().HasForeignKey(x => x.SupplementaryServiceId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

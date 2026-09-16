@@ -34,6 +34,7 @@ public static class DependencyInjection
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IAdministrationService, AdministrationService>();
         services.AddScoped<IServiceCatalogService, ServiceCatalogService>();
+        services.AddScoped<ILegacyCatalogImportService, LegacyCatalogImportService>();
         services.AddScoped<ISalesService, SalesService>();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

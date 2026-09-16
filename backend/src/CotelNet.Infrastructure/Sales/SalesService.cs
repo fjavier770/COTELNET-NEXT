@@ -79,9 +79,9 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
 
     public async Task<ShipmentQuoteDto> QuoteShipmentAsync(QuoteShipmentRequest request, CancellationToken cancellationToken)
     {
-        var (tariff, supplementary) = await GetShipmentPricesAsync(request.PostalServiceId, request.DestinationId, request.WeightGrams, request.SupplementaryServiceIds, cancellationToken);
+        var (tariff, supplementary, available) = await GetShipmentPricesAsync(request.PostalServiceId, request.DestinationId, request.WeightGrams, request.SupplementaryServiceIds, cancellationToken);
         var supplementaryTotal = supplementary.Sum(x => x.Price);
-        return new ShipmentQuoteDto(tariff.Price, supplementaryTotal, tariff.Price + supplementaryTotal, $"{tariff.MinimumWeightGrams + 1}–{tariff.MaximumWeightGrams} g", supplementary.Select(ToDto).ToList());
+        return new ShipmentQuoteDto(tariff.Price, supplementaryTotal, tariff.Price + supplementaryTotal, $"{tariff.MinimumWeightGrams + 1}–{tariff.MaximumWeightGrams} g", available.Select(ToDto).ToList());
     }
 
     public async Task<SaleDto> CreateShipmentAsync(int userId, CreateShipmentRequest request, CancellationToken cancellationToken)
@@ -89,7 +89,7 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
         Require(request.SenderName, "El nombre del remitente"); Require(request.SenderAddress, "La dirección del remitente"); Require(request.RecipientName, "El nombre del destinatario"); Require(request.RecipientAddress, "La dirección del destinatario");
         var session = await db.CashSessions.SingleOrDefaultAsync(x => x.UserId == userId && x.IsOpen, cancellationToken) ?? throw new InvalidOperationException("Debes abrir la caja antes de registrar el envío.");
         var terminal = await db.Terminals.AsNoTracking().SingleAsync(x => x.Id == session.TerminalId, cancellationToken);
-        var (tariff, supplementary) = await GetShipmentPricesAsync(request.PostalServiceId, request.DestinationId, request.WeightGrams, request.SupplementaryServiceIds, cancellationToken);
+        var (tariff, supplementary, _) = await GetShipmentPricesAsync(request.PostalServiceId, request.DestinationId, request.WeightGrams, request.SupplementaryServiceIds, cancellationToken);
         var service = await db.PostalServices.AsNoTracking().SingleAsync(x => x.Id == request.PostalServiceId, cancellationToken);
         var destination = await db.Destinations.AsNoTracking().SingleAsync(x => x.Id == request.DestinationId, cancellationToken);
         var paymentMethod = await db.PaymentMethods.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.PaymentMethodId && x.Active, cancellationToken) ?? throw new InvalidOperationException("La forma de pago no está disponible.");
@@ -97,15 +97,17 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var sale = new Sale($"F-{DateTime.UtcNow:yyyyMMddHHmmssfff}", userId, terminal.EstafetaId, session.Id, total);
         sale.Lines.Add(new SaleLine(null, service.Code, $"{service.Name} · {destination.Name} · {request.WeightGrams} g", 1, tariff.Price));
-        foreach (var item in supplementary) sale.Lines.Add(new SaleLine(null, item.Code, item.Name, 1, item.Price));
+        foreach (var item in supplementary) sale.Lines.Add(new SaleLine(null, item.Service.Code, item.Service.Name, 1, item.Price));
         sale.Payments.Add(new SalePayment(paymentMethod.Id, total));
         db.Sales.Add(sale); await db.SaveChangesAsync(cancellationToken);
         var estafeta = await db.Estafetas.AsNoTracking().SingleAsync(x => x.Id == terminal.EstafetaId, cancellationToken);
-        var trackingNumber = await GenerateS10Async(service.S10Prefix, estafeta.Codigo, cancellationToken);
+        var prefix = service.S10Prefix ?? supplementary.Select(x => x.Service.S10Prefix).FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
+        if (string.IsNullOrWhiteSpace(prefix)) throw new InvalidOperationException("El servicio seleccionado no tiene un formato S10 vigente. Revise el tipo de código de envío en COTELNET.");
+        var trackingNumber = await GenerateS10Async(prefix, estafeta.Codigo, cancellationToken);
         var shipment = new Shipment(sale.Id, trackingNumber, service.Id, destination.Id, request.WeightGrams, tariff.Price,
             request.SenderName, request.SenderDocument ?? string.Empty, request.SenderPhone ?? string.Empty, request.SenderEmail ?? string.Empty, request.SenderAddress,
             request.RecipientName, request.RecipientPhone ?? string.Empty, request.RecipientAddress);
-        foreach (var item in supplementary) shipment.SupplementaryServices.Add(new ShipmentSupplementaryService(item.Id, item.Name, item.Price));
+        foreach (var item in supplementary) shipment.SupplementaryServices.Add(new ShipmentSupplementaryService(item.Service.Id, item.Service.Name, item.Price));
         db.Shipments.Add(shipment); await db.SaveChangesAsync(cancellationToken); await transaction.CommitAsync(cancellationToken);
         return await GetSaleDtoAsync(sale.Id, cancellationToken);
     }
@@ -156,7 +158,7 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
         return new CashSessionDto(session.Id, session.IsOpen, terminal.Id, $"{terminal.Code} - {terminal.Name}", terminal.Estafeta.Nombre, session.OpeningAmount, session.OpenedAtUtc, session.ClosedAtUtc, salesTotal, cashSales, session.OpeningAmount + cashSales, session.DeclaredCash, session.Difference, payments.Select(x => new PaymentSummaryDto(x.Name, x.Amount)).ToList());
     }
 
-    private async Task<(WeightTariff Tariff, List<SupplementaryService> Supplementary)> GetShipmentPricesAsync(int postalServiceId, int destinationId, int weightGrams, IReadOnlyCollection<int>? supplementaryIds, CancellationToken cancellationToken)
+    private async Task<(WeightTariff Tariff, List<PricedSupplementary> Supplementary, List<PricedSupplementary> Available)> GetShipmentPricesAsync(int postalServiceId, int destinationId, int weightGrams, IReadOnlyCollection<int>? supplementaryIds, CancellationToken cancellationToken)
     {
         if (weightGrams <= 0) throw new InvalidOperationException("El peso debe ser mayor que cero.");
         var destination = await db.Destinations.AsNoTracking().SingleOrDefaultAsync(x => x.Id == destinationId && x.Active, cancellationToken) ?? throw new InvalidOperationException("El destino no está disponible.");
@@ -166,13 +168,27 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
         if (weightGrams > maximumWeight) throw new InvalidOperationException($"El peso máximo permitido para este servicio y destino es {maximumWeight.Value / 1000m:0.000} kg.");
         var tariff = await serviceTariffs.Where(x => weightGrams > x.MinimumWeightGrams && weightGrams <= x.MaximumWeightGrams).OrderBy(x => x.MaximumWeightGrams).FirstOrDefaultAsync(cancellationToken)
             ?? throw new InvalidOperationException("No existe una tarifa para el rango de peso seleccionado.");
+        List<PricedSupplementary> available;
+        if (tariff.LegacyTariffId is int legacyTariffId)
+        {
+            var options = await db.TariffSupplementaryOptions.Include(x => x.SupplementaryService).AsNoTracking()
+                .Where(x => x.LegacyTariffId == legacyTariffId && x.SupplementaryService.Active)
+                .OrderBy(x => x.SupplementaryService.Name)
+                .ToListAsync(cancellationToken);
+            available = options.Select(x => new PricedSupplementary(x.SupplementaryService, x.PriceAdjustment > 0 ? x.PriceAdjustment : x.SupplementaryService.Price)).ToList();
+        }
+        else
+        {
+            var services = await db.SupplementaryServices.AsNoTracking().Where(x => x.Active).OrderBy(x => x.Name).ToListAsync(cancellationToken);
+            available = services.Select(x => new PricedSupplementary(x, x.Price)).ToList();
+        }
         var ids = (supplementaryIds ?? []).Distinct().ToArray();
-        var supplementary = await db.SupplementaryServices.AsNoTracking().Where(x => ids.Contains(x.Id) && x.Active).ToListAsync(cancellationToken);
-        if (supplementary.Count != ids.Length) throw new InvalidOperationException("Uno de los servicios suplementarios no está disponible.");
-        return (tariff, supplementary);
+        var supplementary = available.Where(x => ids.Contains(x.Service.Id)).ToList();
+        if (supplementary.Count != ids.Length) throw new InvalidOperationException("Uno de los servicios suplementarios no aplica a la tarifa seleccionada.");
+        return (tariff, supplementary, available);
     }
 
-    private static SupplementaryServiceDto ToDto(SupplementaryService x) => new(x.Id, x.Code, x.Name, x.Price);
+    private static SupplementaryServiceDto ToDto(PricedSupplementary x) => new(x.Service.Id, x.Service.Code, x.Service.Name, x.Price);
     private static void Require(string? value, string field) { if (string.IsNullOrWhiteSpace(value)) throw new InvalidOperationException($"{field} es obligatorio."); }
     private async Task<string> GenerateS10Async(string prefix, string officeCode, CancellationToken cancellationToken)
     {
@@ -186,6 +202,8 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
         if (last >= 9999) throw new InvalidOperationException($"Se agotó el rango anual de códigos S10 para la estafeta {office} y el prefijo {prefix}.");
         return S10CodeGenerator.Generate(prefix, office, last + 1);
     }
+
+    private sealed record PricedSupplementary(SupplementaryService Service, decimal Price);
 
     private static string CreateCode39Svg(string value)
     {

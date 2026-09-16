@@ -13,9 +13,9 @@ Base independiente para modernizar COTELNET con el mismo stack tecnológico de S
 - Nginx como servidor del SPA y proxy hacia la API.
 - Docker Compose, preparado para una red externa `coolify`.
 
-## Estado de esta primera entrega
+## Estado actual
 
-Incluye la arquitectura base, autenticación, usuario administrador opcional, entidad inicial de estafetas, pantalla de acceso, panel de módulos, documentación Swagger, prueba del hash de contraseñas y contenedores. Todavía no incluye conexión ni migración de información del COTELNET actual.
+Incluye autenticación, caja, flujo de admisión postal, cálculo de tarifas por destino y peso, servicios suplementarios, códigos S10 UPU, etiqueta, recibo térmico y mantenimiento de servicios. También incorpora una importación controlada y de solo lectura de los catálogos operativos del COTELNET actual.
 
 ## Inicio con Docker
 
@@ -24,6 +24,22 @@ Incluye la arquitectura base, autenticación, usuario administrador opcional, en
 3. Crear la red local si no existe: `docker network create coolify`.
 4. Ejecutar `docker compose up --build`.
 5. Abrir `http://localhost:8088`.
+
+### Importar los catálogos reales de COTELNET
+
+La importación lee servicios, tipos, vías de encaminamiento, países, provincias, grupos, tarifas, ajustes, suplementarios y formatos S10. No lee ni modifica clientes, usuarios, ventas o historiales del sistema anterior.
+
+1. Habilitar TCP/IP en la instancia SQL Server donde se encuentra la base anterior y comprobar que sea accesible desde Docker.
+2. Agregar en `.env` una conexión con un usuario de solo lectura, por ejemplo:
+
+   ```env
+   LEGACY_DB_CONNECTION_STRING=Server=host.docker.internal,1433;Database=DBCOTELNET;User Id=cotelnet_lector;Password=CAMBIAR;TrustServerCertificate=True
+   ```
+
+3. Recrear la API: `docker compose up -d --build api frontend`.
+4. Ingresar como administrador, abrir **Mantenimiento de servicios** y seleccionar **Importar desde COTELNET**.
+
+La operación reemplaza los catálogos y rangos de tarifa de COTELNET-NEXT, pero conserva las ventas y envíos ya registrados. La base anterior siempre se abre con intención de solo lectura.
 
 La documentación de la API queda disponible a través del contenedor en `/swagger`. Para producción se debe decidir si Swagger será interno o estará deshabilitado.
 
