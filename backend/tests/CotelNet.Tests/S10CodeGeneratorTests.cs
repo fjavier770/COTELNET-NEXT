@@ -19,4 +19,10 @@ public sealed class S10CodeGeneratorTests
     {
         Assert.Equal(expected, S10CodeGenerator.CalculateCheckDigit(serial));
     }
+
+    [Fact]
+    public void FormatHumanReadable_GroupsIdentifierForPostalLabel()
+    {
+        Assert.Equal("RT 042 600 589 PA", S10CodeGenerator.FormatHumanReadable("RT042600589PA"));
+    }
 }

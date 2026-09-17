@@ -237,6 +237,7 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
         const int wide = 5;
         const int gap = 2;
         const int height = 72;
+        const int quietZone = narrow * 10;
         var patterns = new Dictionary<char, string>
         {
             ['0']="nnnwwnwnn", ['1']="wnnwnnnnw", ['2']="nnwwnnnnw", ['3']="wnwwnnnnn", ['4']="nnnwwnnnw",
@@ -250,7 +251,7 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
             ['/']="nwnwnnnwn", ['+']="nwnnnwnwn", ['%']="nnnwnwnwn", ['*']="nwnnwnwnn"
         };
         var encoded = $"*{value.Trim().ToUpperInvariant()}*";
-        var x = 12;
+        var x = quietZone;
         var bars = new StringBuilder();
         foreach (var character in encoded)
         {
@@ -263,7 +264,8 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
             }
             x += gap;
         }
-        var widthTotal = x + 12;
-        return $"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {widthTotal} 96\" role=\"img\" aria-label=\"{value}\"><rect width=\"100%\" height=\"100%\" fill=\"white\"/>{bars}<text x=\"{widthTotal / 2}\" y=\"92\" font-family=\"monospace\" font-size=\"13\" text-anchor=\"middle\">{value}</text></svg>";
+        var widthTotal = x + quietZone;
+        var humanReadable = S10CodeGenerator.FormatHumanReadable(value);
+        return $"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {widthTotal} 100\" role=\"img\" aria-label=\"{humanReadable}\"><rect width=\"100%\" height=\"100%\" fill=\"white\"/>{bars}<text x=\"{widthTotal / 2}\" y=\"94\" font-family=\"Arial, sans-serif\" font-size=\"13\" text-anchor=\"middle\">{humanReadable}</text></svg>";
     }
 }

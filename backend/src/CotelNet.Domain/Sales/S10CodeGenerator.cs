@@ -27,6 +27,17 @@ public static class S10CodeGenerator
         return result switch { 10 => 0, 11 => 5, _ => result };
     }
 
+    public static string FormatHumanReadable(string identifier)
+    {
+        var normalized = identifier?.Trim().ToUpperInvariant() ?? string.Empty;
+        if (normalized.Length != 13 || normalized.Take(2).Any(character => character is < 'A' or > 'Z') ||
+            normalized.Skip(2).Take(9).Any(character => character is < '0' or > '9') ||
+            normalized.Skip(11).Any(character => character is < 'A' or > 'Z'))
+            throw new ArgumentException("El identificador S10 debe tener formato AANNNNNNNNNAA.", nameof(identifier));
+
+        return $"{normalized[..2]} {normalized.Substring(2, 3)} {normalized.Substring(5, 3)} {normalized.Substring(8, 3)} {normalized[^2..]}";
+    }
+
     private static string NormalizeLetters(string value, int length, string field)
     {
         var normalized = value?.Trim().ToUpperInvariant() ?? string.Empty;
