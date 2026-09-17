@@ -160,7 +160,7 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
             shipment = new ShipmentDto(sale.Shipment.TrackingNumber, sale.Shipment.WeightGrams, sale.Shipment.BasePrice, sale.Shipment.PostalService.Name, sale.Shipment.Destination.Name,
                 sale.Shipment.SenderName, sale.Shipment.SenderDocument, sale.Shipment.SenderPhone, sale.Shipment.SenderEmail, sale.Shipment.SenderAddress,
                 sale.Shipment.RecipientName, sale.Shipment.RecipientPhone, sale.Shipment.RecipientAddress,
-                sale.Shipment.SupplementaryServices.Select(x => new SupplementaryServiceDto(x.SupplementaryServiceId, string.Empty, x.Description, x.Price)).ToList(), CreateCode39Svg(sale.Shipment.TrackingNumber));
+                sale.Shipment.SupplementaryServices.Select(x => new SupplementaryServiceDto(x.SupplementaryServiceId, string.Empty, x.Description, x.Price)).ToList(), CreateCode128Svg(sale.Shipment.TrackingNumber));
         var receipt = await (from user in db.Users.AsNoTracking()
                              join office in db.Estafetas.AsNoTracking() on sale.EstafetaId equals office.Id
                              join cash in db.CashSessions.AsNoTracking() on sale.CashSessionId equals cash.Id
@@ -231,7 +231,7 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
 
     private sealed record PricedSupplementary(SupplementaryService Service, decimal Price);
 
-    private static string CreateCode39Svg(string value)
+    private static string CreateLegacyCode39Svg(string value)
     {
         const int narrow = 2;
         const int wide = 5;
@@ -267,5 +267,43 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
         var widthTotal = x + quietZone;
         S10CodeGenerator.TryFormatHumanReadable(value, out var humanReadable);
         return $"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {widthTotal} 100\" role=\"img\" aria-label=\"{humanReadable}\"><rect width=\"100%\" height=\"100%\" fill=\"white\"/>{bars}<text x=\"{widthTotal / 2}\" y=\"94\" font-family=\"Arial, sans-serif\" font-size=\"13\" text-anchor=\"middle\">{humanReadable}</text></svg>";
+    }
+
+    private static string CreateCode128Svg(string value)
+    {
+        const int moduleWidth = 2;
+        const int quietZone = moduleWidth * 10;
+        const int barHeight = 80;
+        const int svgHeight = 112;
+        var patterns = new[]
+        {
+            "212222", "222122", "222221", "121223", "121322", "131222", "122213", "122312", "132212", "221213", "221312", "231212", "112232", "122132", "122231", "113222", "123122", "123221", "223211", "221132", "221231", "213212", "223112", "312131", "311222", "321122", "321221", "312212", "322112", "322211", "212123", "212321", "232121", "111323", "131123", "131321", "112313", "132113", "132311", "211313", "231113", "231311", "112133", "112331", "132131", "113123", "113321", "133121", "313121", "211331", "231131", "213113", "213311", "213131", "311123", "311321", "331121", "312113", "312311", "332111", "314111", "221411", "431111", "111224", "111422", "121124", "121421", "141122", "141221", "112214", "112412", "122114", "122411", "142112", "142211", "241211", "221114", "413111", "241112", "134111", "111242", "121142", "121241", "114212", "124112", "124211", "411212", "421112", "421211", "212141", "214121", "412121", "111143", "111341", "131141", "114113", "114311", "411113", "411311", "113141", "114131", "311141", "411131", "211412", "211214", "211232", "2331112"
+        };
+        var normalized = value.Trim().ToUpperInvariant();
+        if (normalized.Any(character => character < ' ' || character > '~'))
+            throw new InvalidOperationException("El código contiene caracteres no compatibles con Code 128.");
+
+        var codes = new List<int> { 104 };
+        codes.AddRange(normalized.Select(character => character - 32));
+        var checksum = codes.Select((code, index) => index == 0 ? code : code * index).Sum() % 103;
+        codes.Add(checksum);
+        codes.Add(106);
+
+        var x = quietZone;
+        var bars = new StringBuilder();
+        foreach (var code in codes)
+        {
+            var pattern = patterns[code];
+            for (var index = 0; index < pattern.Length; index++)
+            {
+                var width = (pattern[index] - '0') * moduleWidth;
+                if (index % 2 == 0) bars.Append($"<rect x=\"{x}\" y=\"4\" width=\"{width}\" height=\"{barHeight}\"/>");
+                x += width;
+            }
+        }
+
+        var widthTotal = x + quietZone;
+        S10CodeGenerator.TryFormatHumanReadable(value, out var humanReadable);
+        return $"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {widthTotal} {svgHeight}\" role=\"img\" aria-label=\"{humanReadable}\"><rect width=\"100%\" height=\"100%\" fill=\"white\"/>{bars}<text x=\"{widthTotal / 2}\" y=\"106\" font-family=\"Arial, sans-serif\" font-size=\"18\" font-weight=\"700\" text-anchor=\"middle\">{humanReadable}</text></svg>";
     }
 }
