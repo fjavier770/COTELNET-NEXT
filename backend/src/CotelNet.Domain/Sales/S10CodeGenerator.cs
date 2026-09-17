@@ -52,6 +52,20 @@ public static class S10CodeGenerator
         }
     }
 
+    public static string? ResolvePostalFormCode(string? identifier)
+    {
+        var prefix = identifier?.Trim().ToUpperInvariant();
+        if (string.IsNullOrEmpty(prefix)) return null;
+
+        return prefix[0] switch
+        {
+            'R' => "CN-04",
+            'C' => "CP-73",
+            'E' => null,
+            _ => null
+        };
+    }
+
     private static string NormalizeLetters(string value, int length, string field)
     {
         var normalized = value?.Trim().ToUpperInvariant() ?? string.Empty;

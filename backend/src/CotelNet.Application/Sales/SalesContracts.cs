@@ -23,8 +23,13 @@ public sealed record ShipmentQuoteDto(decimal BasePrice, decimal SupplementaryTo
 public sealed record SenderProfileDto(string DocumentNumber, string CountryCode, string Title, bool IsMinor, string FirstName, string MiddleName, string FirstLastName, string SecondLastName, string PrimaryPhone, string SecondaryPhone, string Email, string Province, string City, string PostalCode, string Street, string HouseNumber, string Address, string Fax);
 public sealed record CreateShipmentRequest(string SenderName, string SenderDocument, string SenderPhone, string SenderEmail, string SenderAddress, string RecipientName, string RecipientPhone, string RecipientAddress, int PostalServiceId, int DestinationId, int WeightGrams, IReadOnlyCollection<int>? SupplementaryServiceIds, int PaymentMethodId,
     string? SenderCountryCode = "PA", string? SenderTitle = null, bool SenderIsMinor = false, string? SenderFirstName = null, string? SenderMiddleName = null, string? SenderFirstLastName = null, string? SenderSecondLastName = null,
-    string? SenderSecondaryPhone = null, string? SenderProvince = null, string? SenderCity = null, string? SenderPostalCode = null, string? SenderStreet = null, string? SenderHouseNumber = null, string? SenderFax = null);
-public sealed record ShipmentDto(string TrackingNumber, int WeightGrams, decimal BasePrice, string PostalService, string Destination, string SenderName, string SenderDocument, string SenderPhone, string SenderEmail, string SenderAddress, string RecipientName, string RecipientPhone, string RecipientAddress, IReadOnlyList<SupplementaryServiceDto> SupplementaryServices, string BarcodeSvg);
+    string? SenderSecondaryPhone = null, string? SenderProvince = null, string? SenderCity = null, string? SenderPostalCode = null, string? SenderStreet = null, string? SenderHouseNumber = null, string? SenderFax = null,
+    string? RecipientTitle = null, string? RecipientFirstName = null, string? RecipientMiddleName = null, string? RecipientFirstLastName = null, string? RecipientSecondLastName = null,
+    string? RecipientSecondaryPhone = null, string? RecipientEmail = null, string? RecipientProvince = null, string? RecipientCity = null, string? RecipientPostalCode = null, string? RecipientStreet = null, string? RecipientHouseNumber = null, string? RecipientFax = null);
+public sealed record ShipmentDto(string TrackingNumber, string? PostalFormCode, int WeightGrams, decimal BasePrice, string PostalService, string Destination, string SenderName, string SenderDocument, string SenderPhone, string SenderEmail, string SenderAddress,
+    string RecipientName, string RecipientTitle, string RecipientFirstName, string RecipientMiddleName, string RecipientFirstLastName, string RecipientSecondLastName,
+    string RecipientPhone, string RecipientSecondaryPhone, string RecipientEmail, string RecipientProvince, string RecipientCity, string RecipientPostalCode, string RecipientStreet, string RecipientHouseNumber, string RecipientAddress, string RecipientFax,
+    IReadOnlyList<SupplementaryServiceDto> SupplementaryServices, string BarcodeSvg);
 
 public interface ISalesService
 {

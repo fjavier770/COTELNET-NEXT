@@ -176,7 +176,10 @@ public sealed class CotelNetDbContext(DbContextOptions<CotelNetDbContext> option
             entity.ToTable("Shipments"); entity.HasKey(x => x.Id); entity.HasIndex(x => x.SaleId).IsUnique(); entity.HasIndex(x => x.TrackingNumber).IsUnique();
             entity.Property(x => x.TrackingNumber).HasMaxLength(40).IsRequired(); entity.Property(x => x.BasePrice).HasPrecision(12, 2);
             entity.Property(x => x.SenderName).HasMaxLength(160).IsRequired(); entity.Property(x => x.SenderDocument).HasMaxLength(40); entity.Property(x => x.SenderPhone).HasMaxLength(40); entity.Property(x => x.SenderEmail).HasMaxLength(160); entity.Property(x => x.SenderAddress).HasMaxLength(300).IsRequired();
-            entity.Property(x => x.RecipientName).HasMaxLength(160).IsRequired(); entity.Property(x => x.RecipientPhone).HasMaxLength(40); entity.Property(x => x.RecipientAddress).HasMaxLength(300).IsRequired();
+            entity.Property(x => x.RecipientName).HasMaxLength(160).IsRequired(); entity.Property(x => x.RecipientTitle).HasMaxLength(30); entity.Property(x => x.RecipientFirstName).HasMaxLength(80); entity.Property(x => x.RecipientMiddleName).HasMaxLength(80); entity.Property(x => x.RecipientFirstLastName).HasMaxLength(80); entity.Property(x => x.RecipientSecondLastName).HasMaxLength(80);
+            entity.Property(x => x.RecipientPhone).HasMaxLength(40); entity.Property(x => x.RecipientSecondaryPhone).HasMaxLength(40); entity.Property(x => x.RecipientEmail).HasMaxLength(160);
+            entity.Property(x => x.RecipientProvince).HasMaxLength(100); entity.Property(x => x.RecipientCity).HasMaxLength(100); entity.Property(x => x.RecipientPostalCode).HasMaxLength(20);
+            entity.Property(x => x.RecipientStreet).HasMaxLength(160); entity.Property(x => x.RecipientHouseNumber).HasMaxLength(40); entity.Property(x => x.RecipientAddress).HasMaxLength(300).IsRequired(); entity.Property(x => x.RecipientFax).HasMaxLength(40);
             entity.HasOne(x => x.Sale).WithOne(x => x.Shipment).HasForeignKey<Shipment>(x => x.SaleId);
             entity.HasOne(x => x.PostalService).WithMany().HasForeignKey(x => x.PostalServiceId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Destination).WithMany().HasForeignKey(x => x.DestinationId).OnDelete(DeleteBehavior.Restrict);

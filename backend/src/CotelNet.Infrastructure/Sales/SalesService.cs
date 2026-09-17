@@ -130,7 +130,10 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
         var trackingNumber = await GenerateS10Async(prefix, estafeta.Codigo, cancellationToken);
         var shipment = new Shipment(sale.Id, trackingNumber, service.Id, destination.Id, request.WeightGrams, tariff.Price,
             sender.FullName, sender.DocumentNumber, sender.PrimaryPhone, sender.Email, sender.Address,
-            request.RecipientName, request.RecipientPhone ?? string.Empty, request.RecipientAddress, sender.Id);
+            request.RecipientName, request.RecipientPhone ?? string.Empty, request.RecipientAddress, sender.Id,
+            request.RecipientTitle, request.RecipientFirstName, request.RecipientMiddleName, request.RecipientFirstLastName, request.RecipientSecondLastName,
+            request.RecipientSecondaryPhone, request.RecipientEmail, request.RecipientProvince, request.RecipientCity,
+            request.RecipientPostalCode, request.RecipientStreet, request.RecipientHouseNumber, request.RecipientFax);
         foreach (var item in supplementary) shipment.SupplementaryServices.Add(new ShipmentSupplementaryService(item.Service.Id, item.Service.Name, item.Price));
         db.Shipments.Add(shipment); await db.SaveChangesAsync(cancellationToken); await transaction.CommitAsync(cancellationToken);
         return await GetSaleDtoAsync(sale.Id, cancellationToken);
@@ -157,9 +160,11 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
             .Include(x => x.Shipment)!.ThenInclude(x => x!.SupplementaryServices).AsNoTracking().SingleAsync(x => x.Id == id, cancellationToken);
         ShipmentDto? shipment = null;
         if (sale.Shipment is not null)
-            shipment = new ShipmentDto(sale.Shipment.TrackingNumber, sale.Shipment.WeightGrams, sale.Shipment.BasePrice, sale.Shipment.PostalService.Name, sale.Shipment.Destination.Name,
+            shipment = new ShipmentDto(sale.Shipment.TrackingNumber, S10CodeGenerator.ResolvePostalFormCode(sale.Shipment.TrackingNumber), sale.Shipment.WeightGrams, sale.Shipment.BasePrice, sale.Shipment.PostalService.Name, sale.Shipment.Destination.Name,
                 sale.Shipment.SenderName, sale.Shipment.SenderDocument, sale.Shipment.SenderPhone, sale.Shipment.SenderEmail, sale.Shipment.SenderAddress,
-                sale.Shipment.RecipientName, sale.Shipment.RecipientPhone, sale.Shipment.RecipientAddress,
+                sale.Shipment.RecipientName, sale.Shipment.RecipientTitle, sale.Shipment.RecipientFirstName, sale.Shipment.RecipientMiddleName, sale.Shipment.RecipientFirstLastName, sale.Shipment.RecipientSecondLastName,
+                sale.Shipment.RecipientPhone, sale.Shipment.RecipientSecondaryPhone, sale.Shipment.RecipientEmail,
+                sale.Shipment.RecipientProvince, sale.Shipment.RecipientCity, sale.Shipment.RecipientPostalCode, sale.Shipment.RecipientStreet, sale.Shipment.RecipientHouseNumber, sale.Shipment.RecipientAddress, sale.Shipment.RecipientFax,
                 sale.Shipment.SupplementaryServices.Select(x => new SupplementaryServiceDto(x.SupplementaryServiceId, string.Empty, x.Description, x.Price)).ToList(), CreateCode128Svg(sale.Shipment.TrackingNumber));
         var receipt = await (from user in db.Users.AsNoTracking()
                              join office in db.Estafetas.AsNoTracking() on sale.EstafetaId equals office.Id

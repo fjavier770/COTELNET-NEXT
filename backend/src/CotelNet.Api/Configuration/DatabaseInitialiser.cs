@@ -196,6 +196,19 @@ public static class DatabaseInitialiser
             END
             IF COL_LENGTH('SenderProfiles', 'CountryCode') IS NULL ALTER TABLE SenderProfiles ADD CountryCode nvarchar(2) NOT NULL CONSTRAINT DF_SenderProfiles_CountryCode DEFAULT 'PA';
             IF COL_LENGTH('Shipments', 'SenderProfileId') IS NULL ALTER TABLE Shipments ADD SenderProfileId int NULL;
+            IF COL_LENGTH('Shipments', 'RecipientTitle') IS NULL ALTER TABLE Shipments ADD RecipientTitle nvarchar(30) NOT NULL CONSTRAINT DF_Shipments_RecipientTitle DEFAULT '';
+            IF COL_LENGTH('Shipments', 'RecipientFirstName') IS NULL ALTER TABLE Shipments ADD RecipientFirstName nvarchar(80) NOT NULL CONSTRAINT DF_Shipments_RecipientFirstName DEFAULT '';
+            IF COL_LENGTH('Shipments', 'RecipientMiddleName') IS NULL ALTER TABLE Shipments ADD RecipientMiddleName nvarchar(80) NOT NULL CONSTRAINT DF_Shipments_RecipientMiddleName DEFAULT '';
+            IF COL_LENGTH('Shipments', 'RecipientFirstLastName') IS NULL ALTER TABLE Shipments ADD RecipientFirstLastName nvarchar(80) NOT NULL CONSTRAINT DF_Shipments_RecipientFirstLastName DEFAULT '';
+            IF COL_LENGTH('Shipments', 'RecipientSecondLastName') IS NULL ALTER TABLE Shipments ADD RecipientSecondLastName nvarchar(80) NOT NULL CONSTRAINT DF_Shipments_RecipientSecondLastName DEFAULT '';
+            IF COL_LENGTH('Shipments', 'RecipientSecondaryPhone') IS NULL ALTER TABLE Shipments ADD RecipientSecondaryPhone nvarchar(40) NOT NULL CONSTRAINT DF_Shipments_RecipientSecondaryPhone DEFAULT '';
+            IF COL_LENGTH('Shipments', 'RecipientEmail') IS NULL ALTER TABLE Shipments ADD RecipientEmail nvarchar(160) NOT NULL CONSTRAINT DF_Shipments_RecipientEmail DEFAULT '';
+            IF COL_LENGTH('Shipments', 'RecipientProvince') IS NULL ALTER TABLE Shipments ADD RecipientProvince nvarchar(100) NOT NULL CONSTRAINT DF_Shipments_RecipientProvince DEFAULT '';
+            IF COL_LENGTH('Shipments', 'RecipientCity') IS NULL ALTER TABLE Shipments ADD RecipientCity nvarchar(100) NOT NULL CONSTRAINT DF_Shipments_RecipientCity DEFAULT '';
+            IF COL_LENGTH('Shipments', 'RecipientPostalCode') IS NULL ALTER TABLE Shipments ADD RecipientPostalCode nvarchar(20) NOT NULL CONSTRAINT DF_Shipments_RecipientPostalCode DEFAULT '';
+            IF COL_LENGTH('Shipments', 'RecipientStreet') IS NULL ALTER TABLE Shipments ADD RecipientStreet nvarchar(160) NOT NULL CONSTRAINT DF_Shipments_RecipientStreet DEFAULT '';
+            IF COL_LENGTH('Shipments', 'RecipientHouseNumber') IS NULL ALTER TABLE Shipments ADD RecipientHouseNumber nvarchar(40) NOT NULL CONSTRAINT DF_Shipments_RecipientHouseNumber DEFAULT '';
+            IF COL_LENGTH('Shipments', 'RecipientFax') IS NULL ALTER TABLE Shipments ADD RecipientFax nvarchar(40) NOT NULL CONSTRAINT DF_Shipments_RecipientFax DEFAULT '';
             IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_Shipments_SenderProfiles_SenderProfileId')
                 ALTER TABLE Shipments ADD CONSTRAINT FK_Shipments_SenderProfiles_SenderProfileId FOREIGN KEY (SenderProfileId) REFERENCES SenderProfiles(Id);
             IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Shipments_SenderProfileId' AND object_id = OBJECT_ID('Shipments'))

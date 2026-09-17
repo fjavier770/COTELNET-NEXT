@@ -32,4 +32,14 @@ public sealed class S10CodeGeneratorTests
         Assert.False(S10CodeGenerator.TryFormatHumanReadable("LEGACY-0001", out var formatted));
         Assert.Equal("LEGACY-0001", formatted);
     }
+
+    [Theory]
+    [InlineData("RT042600589PA", "CN-04")]
+    [InlineData("CP042600589PA", "CP-73")]
+    [InlineData("EE042600589PA", null)]
+    [InlineData("LX042600589PA", null)]
+    public void ResolvePostalFormCode_UsesUpuServiceIndicator(string identifier, string? expected)
+    {
+        Assert.Equal(expected, S10CodeGenerator.ResolvePostalFormCode(identifier));
+    }
 }
