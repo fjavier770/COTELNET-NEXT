@@ -265,7 +265,7 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
             x += gap;
         }
         var widthTotal = x + quietZone;
-        var humanReadable = S10CodeGenerator.FormatHumanReadable(value);
+        S10CodeGenerator.TryFormatHumanReadable(value, out var humanReadable);
         return $"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {widthTotal} 100\" role=\"img\" aria-label=\"{humanReadable}\"><rect width=\"100%\" height=\"100%\" fill=\"white\"/>{bars}<text x=\"{widthTotal / 2}\" y=\"94\" font-family=\"Arial, sans-serif\" font-size=\"13\" text-anchor=\"middle\">{humanReadable}</text></svg>";
     }
 }

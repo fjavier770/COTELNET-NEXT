@@ -25,4 +25,11 @@ public sealed class S10CodeGeneratorTests
     {
         Assert.Equal("RT 042 600 589 PA", S10CodeGenerator.FormatHumanReadable("RT042600589PA"));
     }
+
+    [Fact]
+    public void TryFormatHumanReadable_PreservesLegacyIdentifier()
+    {
+        Assert.False(S10CodeGenerator.TryFormatHumanReadable("LEGACY-0001", out var formatted));
+        Assert.Equal("LEGACY-0001", formatted);
+    }
 }

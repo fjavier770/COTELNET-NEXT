@@ -38,6 +38,20 @@ public static class S10CodeGenerator
         return $"{normalized[..2]} {normalized.Substring(2, 3)} {normalized.Substring(5, 3)} {normalized.Substring(8, 3)} {normalized[^2..]}";
     }
 
+    public static bool TryFormatHumanReadable(string? identifier, out string formatted)
+    {
+        try
+        {
+            formatted = FormatHumanReadable(identifier ?? string.Empty);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            formatted = identifier?.Trim().ToUpperInvariant() ?? string.Empty;
+            return false;
+        }
+    }
+
     private static string NormalizeLetters(string value, int length, string field)
     {
         var normalized = value?.Trim().ToUpperInvariant() ?? string.Empty;
