@@ -20,7 +20,10 @@ public sealed record ReceiptContextDto(string Cashier, string OfficeCode, string
 public sealed record SaleLineDto(string Code, string Description, int Quantity, decimal UnitPrice, decimal Total);
 public sealed record QuoteShipmentRequest(int PostalServiceId, int DestinationId, int WeightGrams, IReadOnlyCollection<int>? SupplementaryServiceIds);
 public sealed record ShipmentQuoteDto(decimal BasePrice, decimal SupplementaryTotal, decimal Total, string WeightBand, IReadOnlyList<SupplementaryServiceDto> SupplementaryServices);
-public sealed record CreateShipmentRequest(string SenderName, string SenderDocument, string SenderPhone, string SenderEmail, string SenderAddress, string RecipientName, string RecipientPhone, string RecipientAddress, int PostalServiceId, int DestinationId, int WeightGrams, IReadOnlyCollection<int>? SupplementaryServiceIds, int PaymentMethodId);
+public sealed record SenderProfileDto(string DocumentNumber, string CountryCode, string Title, bool IsMinor, string FirstName, string MiddleName, string FirstLastName, string SecondLastName, string PrimaryPhone, string SecondaryPhone, string Email, string Province, string City, string PostalCode, string Street, string HouseNumber, string Address, string Fax);
+public sealed record CreateShipmentRequest(string SenderName, string SenderDocument, string SenderPhone, string SenderEmail, string SenderAddress, string RecipientName, string RecipientPhone, string RecipientAddress, int PostalServiceId, int DestinationId, int WeightGrams, IReadOnlyCollection<int>? SupplementaryServiceIds, int PaymentMethodId,
+    string? SenderCountryCode = "PA", string? SenderTitle = null, bool SenderIsMinor = false, string? SenderFirstName = null, string? SenderMiddleName = null, string? SenderFirstLastName = null, string? SenderSecondLastName = null,
+    string? SenderSecondaryPhone = null, string? SenderProvince = null, string? SenderCity = null, string? SenderPostalCode = null, string? SenderStreet = null, string? SenderHouseNumber = null, string? SenderFax = null);
 public sealed record ShipmentDto(string TrackingNumber, int WeightGrams, decimal BasePrice, string PostalService, string Destination, string SenderName, string SenderDocument, string SenderPhone, string SenderEmail, string SenderAddress, string RecipientName, string RecipientPhone, string RecipientAddress, IReadOnlyList<SupplementaryServiceDto> SupplementaryServices, string BarcodeSvg);
 
 public interface ISalesService
@@ -31,6 +34,7 @@ public interface ISalesService
     Task<CashSessionDto> CloseCashAsync(int userId, CloseCashRequest request, CancellationToken cancellationToken);
     Task<SaleDto> CreateSaleAsync(int userId, CreateSaleRequest request, CancellationToken cancellationToken);
     Task<ShipmentQuoteDto> QuoteShipmentAsync(QuoteShipmentRequest request, CancellationToken cancellationToken);
+    Task<SenderProfileDto?> GetSenderProfileAsync(string document, CancellationToken cancellationToken);
     Task<SaleDto> CreateShipmentAsync(int userId, CreateShipmentRequest request, CancellationToken cancellationToken);
     Task<SaleDto?> GetSaleAsync(int userId, int saleId, CancellationToken cancellationToken);
     Task<IReadOnlyList<SaleDto>> GetRecentSalesAsync(int userId, CancellationToken cancellationToken);

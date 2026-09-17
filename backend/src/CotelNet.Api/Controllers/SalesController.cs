@@ -23,6 +23,10 @@ public sealed class SalesController(ISalesService service) : ControllerBase
     [Authorize(Policy = PermissionCodes.VentasAccess)]
     public async Task<IActionResult> Recent(CancellationToken cancellationToken) => Ok(await service.GetRecentSalesAsync(UserId(), cancellationToken));
 
+    [HttpGet("sales/senders/{document}")]
+    [Authorize(Policy = PermissionCodes.VentasAccess)]
+    public async Task<IActionResult> Sender(string document, CancellationToken cancellationToken) => Ok(await service.GetSenderProfileAsync(document, cancellationToken));
+
     [HttpGet("sales/cash/current")]
     [Authorize(Policy = PermissionCodes.VentasAccess)]
     public async Task<IActionResult> SalesCurrentCash(CancellationToken cancellationToken) => Ok(await service.GetCurrentCashAsync(UserId(), cancellationToken));

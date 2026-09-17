@@ -166,6 +166,40 @@ public static class DatabaseInitialiser
             IF COL_LENGTH('WeightTariffs', 'LegacyTariffId') IS NULL ALTER TABLE WeightTariffs ADD LegacyTariffId int NULL;
             IF COL_LENGTH('SupplementaryServices', 'LegacyId') IS NULL ALTER TABLE SupplementaryServices ADD LegacyId int NULL;
             IF COL_LENGTH('SupplementaryServices', 'S10Prefix') IS NULL ALTER TABLE SupplementaryServices ADD S10Prefix nvarchar(2) NULL;
+            IF OBJECT_ID('SenderProfiles', 'U') IS NULL
+            BEGIN
+                CREATE TABLE SenderProfiles (
+                    Id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_SenderProfiles PRIMARY KEY,
+                    DocumentKey nvarchar(40) NOT NULL,
+                    DocumentNumber nvarchar(40) NOT NULL,
+                    CountryCode nvarchar(2) NOT NULL CONSTRAINT DF_SenderProfiles_CountryCode DEFAULT 'PA',
+                    Title nvarchar(30) NOT NULL CONSTRAINT DF_SenderProfiles_Title DEFAULT '',
+                    IsMinor bit NOT NULL CONSTRAINT DF_SenderProfiles_IsMinor DEFAULT 0,
+                    FirstName nvarchar(80) NOT NULL,
+                    MiddleName nvarchar(80) NOT NULL CONSTRAINT DF_SenderProfiles_MiddleName DEFAULT '',
+                    FirstLastName nvarchar(80) NOT NULL,
+                    SecondLastName nvarchar(80) NOT NULL CONSTRAINT DF_SenderProfiles_SecondLastName DEFAULT '',
+                    PrimaryPhone nvarchar(40) NOT NULL CONSTRAINT DF_SenderProfiles_PrimaryPhone DEFAULT '',
+                    SecondaryPhone nvarchar(40) NOT NULL CONSTRAINT DF_SenderProfiles_SecondaryPhone DEFAULT '',
+                    Email nvarchar(160) NOT NULL CONSTRAINT DF_SenderProfiles_Email DEFAULT '',
+                    Province nvarchar(100) NOT NULL CONSTRAINT DF_SenderProfiles_Province DEFAULT '',
+                    City nvarchar(100) NOT NULL CONSTRAINT DF_SenderProfiles_City DEFAULT '',
+                    PostalCode nvarchar(20) NOT NULL CONSTRAINT DF_SenderProfiles_PostalCode DEFAULT '',
+                    Street nvarchar(160) NOT NULL CONSTRAINT DF_SenderProfiles_Street DEFAULT '',
+                    HouseNumber nvarchar(40) NOT NULL CONSTRAINT DF_SenderProfiles_HouseNumber DEFAULT '',
+                    Address nvarchar(300) NOT NULL,
+                    Fax nvarchar(40) NOT NULL CONSTRAINT DF_SenderProfiles_Fax DEFAULT '',
+                    CreatedAtUtc datetime2 NOT NULL CONSTRAINT DF_SenderProfiles_CreatedAtUtc DEFAULT SYSUTCDATETIME(),
+                    UpdatedAtUtc datetime2 NULL
+                );
+                CREATE UNIQUE INDEX IX_SenderProfiles_DocumentKey ON SenderProfiles(DocumentKey);
+            END
+            IF COL_LENGTH('SenderProfiles', 'CountryCode') IS NULL ALTER TABLE SenderProfiles ADD CountryCode nvarchar(2) NOT NULL CONSTRAINT DF_SenderProfiles_CountryCode DEFAULT 'PA';
+            IF COL_LENGTH('Shipments', 'SenderProfileId') IS NULL ALTER TABLE Shipments ADD SenderProfileId int NULL;
+            IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_Shipments_SenderProfiles_SenderProfileId')
+                ALTER TABLE Shipments ADD CONSTRAINT FK_Shipments_SenderProfiles_SenderProfileId FOREIGN KEY (SenderProfileId) REFERENCES SenderProfiles(Id);
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Shipments_SenderProfileId' AND object_id = OBJECT_ID('Shipments'))
+                CREATE INDEX IX_Shipments_SenderProfileId ON Shipments(SenderProfileId);
             IF OBJECT_ID('TariffSupplementaryOptions', 'U') IS NULL
             BEGIN
                 CREATE TABLE TariffSupplementaryOptions (

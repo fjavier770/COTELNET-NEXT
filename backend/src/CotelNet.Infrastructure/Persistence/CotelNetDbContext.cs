@@ -24,6 +24,7 @@ public sealed class CotelNetDbContext(DbContextOptions<CotelNetDbContext> option
     public DbSet<Destination> Destinations => Set<Destination>();
     public DbSet<WeightTariff> WeightTariffs => Set<WeightTariff>();
     public DbSet<SupplementaryService> SupplementaryServices => Set<SupplementaryService>();
+    public DbSet<SenderProfile> SenderProfiles => Set<SenderProfile>();
     public DbSet<Shipment> Shipments => Set<Shipment>();
     public DbSet<ShipmentSupplementaryService> ShipmentSupplementaryServices => Set<ShipmentSupplementaryService>();
     public DbSet<TariffSupplementaryOption> TariffSupplementaryOptions => Set<TariffSupplementaryOption>();
@@ -161,6 +162,15 @@ public sealed class CotelNetDbContext(DbContextOptions<CotelNetDbContext> option
             entity.Property(x => x.Code).HasMaxLength(30).IsRequired(); entity.Property(x => x.Name).HasMaxLength(140).IsRequired(); entity.Property(x => x.Price).HasPrecision(12, 2);
             entity.Property(x => x.S10Prefix).HasMaxLength(2); entity.HasIndex(x => x.LegacyId).IsUnique().HasFilter("[LegacyId] IS NOT NULL");
         });
+        modelBuilder.Entity<SenderProfile>(entity =>
+        {
+            entity.ToTable("SenderProfiles"); entity.HasKey(x => x.Id); entity.HasIndex(x => x.DocumentKey).IsUnique();
+            entity.Property(x => x.DocumentKey).HasMaxLength(40).IsRequired(); entity.Property(x => x.DocumentNumber).HasMaxLength(40).IsRequired(); entity.Property(x => x.CountryCode).HasMaxLength(2).IsRequired(); entity.Property(x => x.Title).HasMaxLength(30);
+            entity.Property(x => x.FirstName).HasMaxLength(80).IsRequired(); entity.Property(x => x.MiddleName).HasMaxLength(80); entity.Property(x => x.FirstLastName).HasMaxLength(80).IsRequired(); entity.Property(x => x.SecondLastName).HasMaxLength(80);
+            entity.Property(x => x.PrimaryPhone).HasMaxLength(40); entity.Property(x => x.SecondaryPhone).HasMaxLength(40); entity.Property(x => x.Email).HasMaxLength(160);
+            entity.Property(x => x.Province).HasMaxLength(100); entity.Property(x => x.City).HasMaxLength(100); entity.Property(x => x.PostalCode).HasMaxLength(20); entity.Property(x => x.Street).HasMaxLength(160); entity.Property(x => x.HouseNumber).HasMaxLength(40); entity.Property(x => x.Address).HasMaxLength(300).IsRequired(); entity.Property(x => x.Fax).HasMaxLength(40);
+            entity.Ignore(x => x.FullName);
+        });
         modelBuilder.Entity<Shipment>(entity =>
         {
             entity.ToTable("Shipments"); entity.HasKey(x => x.Id); entity.HasIndex(x => x.SaleId).IsUnique(); entity.HasIndex(x => x.TrackingNumber).IsUnique();
@@ -170,6 +180,7 @@ public sealed class CotelNetDbContext(DbContextOptions<CotelNetDbContext> option
             entity.HasOne(x => x.Sale).WithOne(x => x.Shipment).HasForeignKey<Shipment>(x => x.SaleId);
             entity.HasOne(x => x.PostalService).WithMany().HasForeignKey(x => x.PostalServiceId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Destination).WithMany().HasForeignKey(x => x.DestinationId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.SenderProfile).WithMany().HasForeignKey(x => x.SenderProfileId).OnDelete(DeleteBehavior.Restrict);
             entity.HasMany(x => x.SupplementaryServices).WithOne().HasForeignKey(x => x.ShipmentId);
         });
         modelBuilder.Entity<ShipmentSupplementaryService>(entity =>

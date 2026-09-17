@@ -84,9 +84,17 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
         return new ShipmentQuoteDto(tariff.Price, supplementaryTotal, tariff.Price + supplementaryTotal, $"{tariff.MinimumWeightGrams + 1}–{tariff.MaximumWeightGrams} g", available.Select(ToDto).ToList());
     }
 
+    public async Task<SenderProfileDto?> GetSenderProfileAsync(string document, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(document)) return null;
+        var key = SenderProfile.NormalizeDocument(document);
+        var sender = await db.SenderProfiles.AsNoTracking().SingleOrDefaultAsync(x => x.DocumentKey == key, cancellationToken);
+        return sender is null ? null : ToDto(sender);
+    }
+
     public async Task<SaleDto> CreateShipmentAsync(int userId, CreateShipmentRequest request, CancellationToken cancellationToken)
     {
-        Require(request.SenderName, "El nombre del remitente"); Require(request.SenderAddress, "La dirección del remitente"); Require(request.RecipientName, "El nombre del destinatario"); Require(request.RecipientAddress, "La dirección del destinatario");
+        Require(request.SenderDocument, "La cédula o pasaporte del remitente"); Require(request.SenderFirstName, "El primer nombre del remitente"); Require(request.SenderFirstLastName, "El primer apellido del remitente"); Require(request.SenderAddress, "La dirección del remitente"); Require(request.RecipientName, "El nombre del destinatario"); Require(request.RecipientAddress, "La dirección del destinatario");
         var session = await db.CashSessions.SingleOrDefaultAsync(x => x.UserId == userId && x.IsOpen, cancellationToken) ?? throw new InvalidOperationException("Debes abrir la caja antes de registrar el envío.");
         var terminal = await db.Terminals.AsNoTracking().SingleAsync(x => x.Id == session.TerminalId, cancellationToken);
         var (tariff, supplementary, _) = await GetShipmentPricesAsync(request.PostalServiceId, request.DestinationId, request.WeightGrams, request.SupplementaryServiceIds, cancellationToken);
@@ -95,6 +103,22 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
         var paymentMethod = await db.PaymentMethods.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.PaymentMethodId && x.Active, cancellationToken) ?? throw new InvalidOperationException("La forma de pago no está disponible.");
         var total = tariff.Price + supplementary.Sum(x => x.Price);
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        var documentKey = SenderProfile.NormalizeDocument(request.SenderDocument);
+        var sender = await db.SenderProfiles.SingleOrDefaultAsync(x => x.DocumentKey == documentKey, cancellationToken);
+        if (sender is null)
+        {
+            sender = new SenderProfile(request.SenderDocument, request.SenderTitle, request.SenderIsMinor, request.SenderCountryCode, request.SenderFirstName!, request.SenderMiddleName,
+                request.SenderFirstLastName!, request.SenderSecondLastName, request.SenderPhone, request.SenderSecondaryPhone, request.SenderEmail,
+                request.SenderProvince, request.SenderCity, request.SenderPostalCode, request.SenderStreet, request.SenderHouseNumber, request.SenderAddress, request.SenderFax);
+            db.SenderProfiles.Add(sender);
+        }
+        else
+        {
+            sender.Update(request.SenderDocument, request.SenderTitle, request.SenderIsMinor, request.SenderCountryCode, request.SenderFirstName!, request.SenderMiddleName,
+                request.SenderFirstLastName!, request.SenderSecondLastName, request.SenderPhone, request.SenderSecondaryPhone, request.SenderEmail,
+                request.SenderProvince, request.SenderCity, request.SenderPostalCode, request.SenderStreet, request.SenderHouseNumber, request.SenderAddress, request.SenderFax);
+        }
+        await db.SaveChangesAsync(cancellationToken);
         var sale = new Sale($"F-{DateTime.UtcNow:yyyyMMddHHmmssfff}", userId, terminal.EstafetaId, session.Id, total);
         sale.Lines.Add(new SaleLine(null, service.Code, $"{service.Name} · {destination.Name} · {request.WeightGrams} g", 1, tariff.Price));
         foreach (var item in supplementary) sale.Lines.Add(new SaleLine(null, item.Service.Code, item.Service.Name, 1, item.Price));
@@ -105,8 +129,8 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
         if (string.IsNullOrWhiteSpace(prefix)) throw new InvalidOperationException("El servicio seleccionado no tiene un formato S10 vigente. Revise el tipo de código de envío en COTELNET.");
         var trackingNumber = await GenerateS10Async(prefix, estafeta.Codigo, cancellationToken);
         var shipment = new Shipment(sale.Id, trackingNumber, service.Id, destination.Id, request.WeightGrams, tariff.Price,
-            request.SenderName, request.SenderDocument ?? string.Empty, request.SenderPhone ?? string.Empty, request.SenderEmail ?? string.Empty, request.SenderAddress,
-            request.RecipientName, request.RecipientPhone ?? string.Empty, request.RecipientAddress);
+            sender.FullName, sender.DocumentNumber, sender.PrimaryPhone, sender.Email, sender.Address,
+            request.RecipientName, request.RecipientPhone ?? string.Empty, request.RecipientAddress, sender.Id);
         foreach (var item in supplementary) shipment.SupplementaryServices.Add(new ShipmentSupplementaryService(item.Service.Id, item.Service.Name, item.Price));
         db.Shipments.Add(shipment); await db.SaveChangesAsync(cancellationToken); await transaction.CommitAsync(cancellationToken);
         return await GetSaleDtoAsync(sale.Id, cancellationToken);
@@ -189,6 +213,8 @@ public sealed class SalesService(CotelNetDbContext db) : ISalesService
     }
 
     private static SupplementaryServiceDto ToDto(PricedSupplementary x) => new(x.Service.Id, x.Service.Code, x.Service.Name, x.Price);
+    private static SenderProfileDto ToDto(SenderProfile x) => new(x.DocumentNumber, x.CountryCode, x.Title, x.IsMinor, x.FirstName, x.MiddleName, x.FirstLastName, x.SecondLastName,
+        x.PrimaryPhone, x.SecondaryPhone, x.Email, x.Province, x.City, x.PostalCode, x.Street, x.HouseNumber, x.Address, x.Fax);
     private static void Require(string? value, string field) { if (string.IsNullOrWhiteSpace(value)) throw new InvalidOperationException($"{field} es obligatorio."); }
     private async Task<string> GenerateS10Async(string prefix, string officeCode, CancellationToken cancellationToken)
     {
